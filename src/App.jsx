@@ -1593,15 +1593,7 @@ export default function App() {
       if (tableError) setMessage(tableError.message);
       setLeagueTable(tableData || null);
       setLeagueLoading(false);
-      const { data: items, error: auctionError } = await supabase
-        .from("auctions")
-        .select(
-          "id,stage,status,reserve_price_pence,current_price_pence,current_winner_club_id,ends_at,min_increment_pence,player_seasons!inner(id,game_position,overall_rating,players!inner(full_name),clubs!inner(name))",
-        )
-        .eq("stage", 1)
-        .in("status", ["scheduled", "live"])
-        .order("current_price_pence", { ascending: false })
-        .limit(100);
+      const { data: items, error: auctionError } = await supabase.rpc("get_auction_room", { p_stage: 1 });
       if (auctionError) setMessage(auctionError.message);
       setAuctions(items || []);
     }
