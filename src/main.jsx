@@ -5,6 +5,7 @@ import './styles.css'
 import './auction-room.css'
 import './dashboard.css'
 import './squad.css'
+import './lineup.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

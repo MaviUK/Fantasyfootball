@@ -399,6 +399,40 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
   return <section className="squad-page"><div className="squad-heading"><div><span className="eyebrow">Provisional squad</span><h2>Build your 17</h2><p>These are players you currently lead the bidding for. They only become permanent squad members when their auctions close.</p></div><button className="primary-btn" onClick={onOpenAuctions}>Find players</button></div><div className="squad-progress"><div><span>Total players</span><strong>{players.length}<small>/17</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, players.length / 17 * 100)}%` }} /></div></div><div><span>Goalkeepers</span><strong>{goalkeepers.length}<small>/2</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, goalkeepers.length / 2 * 100)}%` }} /></div></div><div><span>Outfield</span><strong>{outfield.length}<small>/15</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, outfield.length / 15 * 100)}%` }} /></div></div><div><span>Provisional cost</span><strong>{money(totalCost)}</strong><small>Current leading bids</small></div></div>{slots.map(group => <div className="squad-group" key={group.label}><div className="section-head"><div><span className="eyebrow">{group.players.length} of {group.required}</span><h3>{group.label}</h3></div></div><div className="squad-list">{group.players.map(a => <article key={a.id}><div className="avatar">{position(a)}</div><div className="squad-player"><strong>{name(a)}</strong><span>{a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</span></div><div className="squad-bid"><span>Leading bid</span><strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong></div><div className="provisional-badge">Provisional</div></article>)}{Array.from({ length: Math.max(0, group.required - group.players.length) }, (_, index) => <button className="empty-squad-slot" key={`empty-${index}`} onClick={onOpenAuctions}><span>+</span><div><strong>Empty slot</strong><small>Find a {group.label === "Goalkeepers" ? "goalkeeper" : "player"}</small></div></button>)}</div></div>)}</section>
 }
 
+function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
+  const players = auctions.filter(a => a.current_winner_club_id === club.id)
+  const [starters, setStarters] = useState(() => { try { return JSON.parse(localStorage.getItem("fantasy-lineup-starters") || "[]") } catch { return [] } })
+  const [bench, setBench] = useState(() => { try { return JSON.parse(localStorage.getItem("fantasy-lineup-bench") || "[]") } catch { return [] } })
+  const [lineupMessage, setLineupMessage] = useState("")
+  const playerIds = players.map(a => a.id)
+  const startingPlayers = starters.map(id => players.find(a => a.id === id)).filter(Boolean)
+  const benchPlayers = bench.map(id => players.find(a => a.id === id)).filter(Boolean)
+  const availablePlayers = players.filter(a => !starters.includes(a.id) && !bench.includes(a.id))
+  const startGoalkeepers = startingPlayers.filter(a => position(a) === "GK").length
+  const startOutfield = startingPlayers.length - startGoalkeepers
+  const benchGoalkeepers = benchPlayers.filter(a => position(a) === "GK").length
+  const benchOutfield = benchPlayers.length - benchGoalkeepers
+  const lineupComplete = startingPlayers.length === 11 && startGoalkeepers === 1 && benchPlayers.length === 6 && benchGoalkeepers === 1
+
+  useEffect(() => { const validStarters = starters.filter(id => playerIds.includes(id)), validBench = bench.filter(id => playerIds.includes(id)); if (validStarters.length !== starters.length) setStarters(validStarters); if (validBench.length !== bench.length) setBench(validBench) }, [auctions])
+  useEffect(() => { localStorage.setItem("fantasy-lineup-starters", JSON.stringify(starters)) }, [starters])
+  useEffect(() => { localStorage.setItem("fantasy-lineup-bench", JSON.stringify(bench)) }, [bench])
+
+  function assign(a, destination) {
+    const goalkeeper = position(a) === "GK"
+    if (destination === "start" && (startingPlayers.length >= 11 || goalkeeper && startGoalkeepers >= 1 || !goalkeeper && startOutfield >= 10)) return setLineupMessage(goalkeeper ? "The starting XI can only contain one goalkeeper." : "The starting XI already has ten outfield players.")
+    if (destination === "bench" && (benchPlayers.length >= 6 || goalkeeper && benchGoalkeepers >= 1 || !goalkeeper && benchOutfield >= 5)) return setLineupMessage(goalkeeper ? "The bench can only contain one goalkeeper." : "The bench already has five outfield players.")
+    setStarters(current => destination === "start" ? [...current.filter(id => id !== a.id), a.id] : current.filter(id => id !== a.id))
+    setBench(current => destination === "bench" ? [...current.filter(id => id !== a.id), a.id] : current.filter(id => id !== a.id))
+    setLineupMessage("")
+  }
+
+  function remove(id) { setStarters(current => current.filter(item => item !== id)); setBench(current => current.filter(item => item !== id)); setLineupMessage("") }
+  const PlayerRow = ({ a, selected }) => <article className="lineup-player"><div className="avatar">{position(a)}</div><div><strong>{name(a)}</strong><small>{a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div>{selected ? <button className="lineup-remove" onClick={() => remove(a.id)}>Remove</button> : <div className="lineup-actions"><button onClick={() => assign(a, "start")}>Start</button><button onClick={() => assign(a, "bench")}>Bench</button></div>}</article>
+
+  return <section className="lineup-page"><div className="lineup-heading"><div><span className="eyebrow">Daily team selection</span><h2>Pick your team</h2><p>Select one goalkeeper and ten outfield starters, plus one goalkeeper and five outfield substitutes.</p></div><div className={`lineup-status${lineupComplete ? " complete" : ""}`}><span>{lineupComplete ? "✓ Lineup ready" : `${startingPlayers.length + benchPlayers.length}/17 selected`}</span><small>{season?.first_match_at ? `Deadline ${new Date(season.first_match_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "Deadline to be announced"}</small></div></div>{lineupMessage && <div className="lineup-warning">{lineupMessage}</div>}{players.length < 17 && <div className="lineup-notice"><div><strong>Your provisional squad is not complete.</strong><span>You can plan with current winning bids and fill the remaining positions as you sign players.</span></div><button className="secondary-btn" onClick={onOpenAuctions}>Find players</button></div>}<div className="lineup-columns"><div className="lineup-column"><div className="lineup-column-head"><div><span className="eyebrow">Starting XI</span><h3>{startingPlayers.length}/11</h3></div><small>{startGoalkeepers}/1 GK · {startOutfield}/10 outfield</small></div><div className="lineup-list">{startingPlayers.map(a => <PlayerRow key={a.id} a={a} selected />)}{Array.from({ length: Math.max(0, 11 - startingPlayers.length) }, (_, i) => <div className="lineup-empty" key={i}>Empty starting position</div>)}</div></div><div className="lineup-column"><div className="lineup-column-head"><div><span className="eyebrow">Substitutes</span><h3>{benchPlayers.length}/6</h3></div><small>{benchGoalkeepers}/1 GK · {benchOutfield}/5 outfield</small></div><div className="lineup-list">{benchPlayers.map(a => <PlayerRow key={a.id} a={a} selected />)}{Array.from({ length: Math.max(0, 6 - benchPlayers.length) }, (_, i) => <div className="lineup-empty" key={i}>Empty substitute position</div>)}</div></div></div><div className="available-section"><div className="section-head"><div><span className="eyebrow">Unselected</span><h3>Available squad players</h3></div><span className="results-count">{availablePlayers.length} available</span></div>{availablePlayers.length ? <div className="available-lineup-list">{availablePlayers.map(a => <PlayerRow key={a.id} a={a} />)}</div> : <div className="empty-state"><strong>No unselected players.</strong><span>Remove a player from the XI or bench to change your selection.</span></div>}</div></section>
+}
+
 export default function App() {
   const [session, setSession] = useState(null),
     [authReady, setAuthReady] = useState(false),
@@ -608,6 +642,8 @@ export default function App() {
                 ? "Club headquarters"
                 : view === "squad"
                   ? "Provisional 17-player squad"
+                  : view === "lineup"
+                    ? "Starting XI and substitutes"
                   : "Day 1 auction room · prices update live"}
             </p>
           </div>
@@ -633,6 +669,12 @@ export default function App() {
             onClick={() => setView("squad")}
           >
             My Squad <span>{winning}/17</span>
+          </button>
+          <button
+            className={view === "lineup" ? "active" : ""}
+            onClick={() => setView("lineup")}
+          >
+            Lineup
           </button>
         </nav>
         <section className="stats-grid">
@@ -673,6 +715,8 @@ export default function App() {
           />
         ) : view === "squad" ? (
           <ProvisionalSquad club={club} auctions={auctions} onOpenAuctions={() => setView("auctions")} />
+        ) : view === "lineup" ? (
+          <LineupPlanner club={club} season={season} auctions={auctions} onOpenAuctions={() => setView("auctions")} />
         ) : (
           <section className="section">
             <div className="section-head">
