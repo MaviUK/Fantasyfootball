@@ -1251,6 +1251,66 @@ function FixturesPage({ fixtures, loading }) {
   );
 }
 
+function LeagueTablePage({ data, loading }) {
+  if (loading)
+    return <div className="table-loading">Loading league standings…</div>;
+
+  const league = data?.league;
+  const standings = data?.standings || [];
+  if (!league)
+    return (
+      <div className="empty-state table-empty">
+        <strong>Your club has not joined a league yet.</strong>
+        <span>The table will appear as soon as league placement is complete.</span>
+      </div>
+    );
+
+  const zone = (row) => {
+    const automatic = Number(league.automatic_promotion_places || league.promotion_places || 0);
+    const playoffs = Number(league.playoff_places || 0);
+    const relegation = Number(league.relegation_places || 0);
+    if (row.position <= automatic) return "promotion";
+    if (row.position <= automatic + playoffs) return "playoff";
+    if (relegation && row.position > standings.length - relegation) return "relegation";
+    return "";
+  };
+
+  return (
+    <section className="league-page">
+      <div className="league-heading">
+        <div>
+          <span className="eyebrow">Tier {league.tier}</span>
+          <h2>{league.name}</h2>
+          <p>{standings.length} clubs · Three points for a win</p>
+        </div>
+        <div className="league-key">
+          {!!Number(league.promotion_places) && <span><i className="key-promotion" />Promotion</span>}
+          {!!Number(league.playoff_places) && <span><i className="key-playoff" />Playoffs</span>}
+          {!!Number(league.relegation_places) && <span><i className="key-relegation" />Relegation</span>}
+        </div>
+      </div>
+      <div className="league-table-wrap">
+        <table className="league-table">
+          <thead><tr><th>Pos</th><th>Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+          <tbody>
+            {standings.map((row) => (
+              <tr key={row.club_id} className={`${row.is_my_club ? "my-club" : ""} ${zone(row)}`}>
+                <td><span className="position-cell">{row.position}</span></td>
+                <td className="club-cell"><strong>{row.club_name}</strong>{row.is_my_club && <small>You</small>}</td>
+                <td>{row.played}</td><td>{row.won}</td><td>{row.drawn}</td><td>{row.lost}</td>
+                <td>{row.goals_for}</td><td>{row.goals_against}</td>
+                <td>{Number(row.goal_difference) > 0 ? `+${row.goal_difference}` : row.goal_difference}</td>
+                <td className="points-cell">{row.points}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="table-note">Teams level on points are separated by goal difference, then goals scored.</p>
+    </section>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null),
     [authReady, setAuthReady] = useState(false),
@@ -1259,6 +1319,8 @@ export default function App() {
     [loading, setLoading] = useState(true),
     [fixtures, setFixtures] = useState([]),
     [fixturesLoading, setFixturesLoading] = useState(false),
+    [leagueTable, setLeagueTable] = useState(null),
+    [leagueLoading, setLeagueLoading] = useState(false),
     [message, setMessage] = useState(""),
     [bid, setBid] = useState({}),
     [bidding, setBidding] = useState(null),
@@ -1305,6 +1367,11 @@ export default function App() {
       if (fixtureError) setMessage(fixtureError.message);
       setFixtures(fixtureItems || []);
       setFixturesLoading(false);
+      setLeagueLoading(true);
+      const { data: tableData, error: tableError } = await supabase.rpc("get_my_league_table");
+      if (tableError) setMessage(tableError.message);
+      setLeagueTable(tableData || null);
+      setLeagueLoading(false);
       const { data: items, error: auctionError } = await supabase
         .from("auctions")
         .select(
@@ -1499,6 +1566,8 @@ export default function App() {
                     ? "Starting XI and substitutes"
                     : view === "fixtures"
                       ? "Match schedule and results"
+                      : view === "table"
+                        ? "League position and season record"
                     : "Day 1 auction room · prices update live"}
             </p>
           </div>
@@ -1536,6 +1605,12 @@ export default function App() {
             onClick={() => setView("fixtures")}
           >
             Fixtures <span>{fixtures.length}</span>
+          </button>
+          <button
+            className={view === "table" ? "active" : ""}
+            onClick={() => setView("table")}
+          >
+            League Table
           </button>
         </nav>
         <section className="stats-grid">
@@ -1589,6 +1664,8 @@ export default function App() {
           />
         ) : view === "fixtures" ? (
           <FixturesPage fixtures={fixtures} loading={fixturesLoading} />
+        ) : view === "table" ? (
+          <LeagueTablePage data={leagueTable} loading={leagueLoading} />
         ) : (
           <section className="section">
             <div className="section-head">

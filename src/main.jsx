@@ -11,6 +11,7 @@ import './formation.css'
 import './pitch.css'
 import './lineup-order.css'
 import './fixtures.css'
+import './league-table.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

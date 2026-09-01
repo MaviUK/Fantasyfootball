@@ -1,0 +1,32 @@
+.league-page { display: grid; gap: 22px; padding: 8px 0 48px; }
+.league-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+.league-heading h2 { margin: 6px 0; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.league-heading p, .table-note { margin: 0; color: var(--muted); }
+.league-key { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: .8rem; }
+.league-key span { display: flex; gap: 6px; align-items: center; }
+.league-key i { width: 9px; height: 9px; border-radius: 50%; }
+.key-promotion { background: #72eea4; }
+.key-playoff { background: #e5c566; }
+.key-relegation { background: #d95c68; }
+.league-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 18px; background: var(--panel); }
+.league-table { width: 100%; min-width: 720px; border-collapse: collapse; }
+.league-table th { padding: 13px 15px; color: var(--muted); background: rgba(255,255,255,.025); font-size: .72rem; text-align: center; text-transform: uppercase; letter-spacing: .08em; }
+.league-table th:nth-child(2), .league-table td:nth-child(2) { text-align: left; }
+.league-table td { padding: 14px 15px; text-align: center; border-top: 1px solid var(--border); }
+.league-table tbody tr { position: relative; }
+.league-table tbody tr:hover { background: rgba(255,255,255,.025); }
+.league-table tbody tr.my-club { background: rgba(114, 238, 164, .09); }
+.league-table tbody tr td:first-child { border-left: 3px solid transparent; }
+.league-table tbody tr.promotion td:first-child { border-left-color: #72eea4; }
+.league-table tbody tr.playoff td:first-child { border-left-color: #e5c566; }
+.league-table tbody tr.relegation td:first-child { border-left-color: #d95c68; }
+.position-cell { display: inline-grid; place-items: center; width: 28px; height: 28px; color: var(--muted); }
+.club-cell strong { display: inline-block; }
+.club-cell small { margin-left: 9px; padding: 3px 7px; color: #07120d; background: #72eea4; border-radius: 999px; font-size: .68rem; font-weight: 800; }
+.points-cell { font-size: 1.05rem; font-weight: 900; }
+.table-note { padding-left: 4px; font-size: .8rem; }
+.table-loading, .table-empty { padding: 48px; text-align: center; }
+@media (max-width: 700px) {
+  .league-heading { align-items: stretch; flex-direction: column; }
+  .league-table th, .league-table td { padding: 12px 10px; }
+}
