@@ -57,7 +57,7 @@ button:disabled {
 }
 .auction-toolbar {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px auto;
+  grid-template-columns: minmax(220px, 1fr) 160px 180px auto;
   gap: 12px;
   margin-top: 18px;
 }
@@ -133,6 +133,31 @@ button:disabled {
 }
 .bid-label {
   margin-top: 2px;
+}
+.quick-bids {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.quick-bids span {
+  margin-right: auto;
+  color: #758197;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.quick-bids button {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #9ceec2;
+  padding: 6px 8px;
+  font-size: 10px;
+}
+.quick-bids button:hover {
+  border-color: rgba(116, 240, 167, 0.28);
+  background: rgba(116, 240, 167, 0.08);
 }
 .field-error {
   display: block;

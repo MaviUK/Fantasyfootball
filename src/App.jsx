@@ -152,6 +152,7 @@ function AuctionCard({
   toggleHistory,
   watched,
   toggleWatch,
+  availablePence,
 }) {
   const p = a.player_seasons,
     leading = a.current_winner_club_id === clubId,
@@ -160,7 +161,12 @@ function AuctionCard({
   const minimum = a.current_winner_club_id
     ? Number(a.current_price_pence) + Number(a.min_increment_pence)
     : Number(a.reserve_price_pence);
-  const invalid = value !== "" && Math.round(Number(value) * 100) < minimum;
+  const proposed = value === "" ? minimum : Math.round(Number(value) * 100);
+  const maximum = Number(availablePence) + (leading ? Number(a.current_price_pence || 0) : 0);
+  const belowMinimum = value !== "" && proposed < minimum;
+  const overBudget = proposed > maximum;
+  const invalid = belowMinimum || overBudget;
+  const quickBid = increase => setValue(String(Math.max(minimum, Number(a.current_price_pence || a.reserve_price_pence) + increase) / 100));
   return (
     <article
       className={`auction-card${leading ? " is-winning" : ""}${ended ? " is-ended" : ""}`}
@@ -215,9 +221,11 @@ function AuctionCard({
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
-      {invalid && (
+      <div className="quick-bids"><span>Quick bid</span><button type="button" disabled={ended || a.status !== "live"} onClick={() => quickBid(50000000)}>+£0.5m</button><button type="button" disabled={ended || a.status !== "live"} onClick={() => quickBid(100000000)}>+£1m</button><button type="button" disabled={ended || a.status !== "live"} onClick={() => setValue(String(minimum / 100))}>Minimum</button></div>
+      {belowMinimum && (
         <small className="field-error">Minimum bid is {money(minimum)}</small>
       )}
+      {overBudget && <small className="field-error">Your maximum available bid is {money(maximum)}</small>}
       <div className="hero-actions">
         <button
           className="primary-btn"
@@ -393,6 +401,7 @@ export default function App() {
     [query, setQuery] = useState(""),
     [positionFilter, setPositionFilter] = useState("ALL"),
     [show, setShow] = useState("all"),
+    [sort, setSort] = useState("ending"),
     [view, setView] = useState("home"),
     [watchlist, setWatchlist] = useState(() => {
       try {
@@ -551,8 +560,14 @@ export default function App() {
             (show === "live" && a.status === "live") ||
             (show === "watched" && watchlist.includes(a.id)))
         );
+      }).sort((a, b) => {
+        if (sort === "price-low") return Number(a.current_price_pence || a.reserve_price_pence) - Number(b.current_price_pence || b.reserve_price_pence);
+        if (sort === "price-high") return Number(b.current_price_pence || b.reserve_price_pence) - Number(a.current_price_pence || a.reserve_price_pence);
+        if (sort === "rating") return Number(b.player_seasons?.overall_rating || 0) - Number(a.player_seasons?.overall_rating || 0);
+        if (sort === "name") return name(a).localeCompare(name(b));
+        return new Date(a.ends_at || "9999-12-31") - new Date(b.ends_at || "9999-12-31");
       }),
-    [auctions, query, positionFilter, show, state?.club?.id, watchlist, tick],
+    [auctions, query, positionFilter, show, sort, state?.club?.id, watchlist, tick],
   );
   if (!authReady)
     return <div className="loading-screen">Loading Fantasy Football…</div>;
@@ -663,6 +678,13 @@ export default function App() {
                   <option key={item}>{item}</option>
                 ))}
               </select>
+              <select aria-label="Sort auctions" value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="ending">Ending soon</option>
+                <option value="price-low">Price: low to high</option>
+                <option value="price-high">Price: high to low</option>
+                <option value="rating">Highest rating</option>
+                <option value="name">Player name</option>
+              </select>
               <div className="segmented">
                 <button
                   className={show === "all" ? "active" : ""}
@@ -710,6 +732,7 @@ export default function App() {
                     toggleHistory={() => loadHistory(a.id)}
                     watched={watchlist.includes(a.id)}
                     toggleWatch={() => toggleWatch(a.id)}
+                    availablePence={available}
                   />
                 ))}
               </div>
