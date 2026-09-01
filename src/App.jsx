@@ -558,18 +558,155 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
 }
 
 const FORMATION_PITCH = {
-  "4-4-2": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[12,44],[38,48],[62,48],[88,44]], ATT:[[38,17],[62,17]] },
-  "4-3-3": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[25,47],[50,51],[75,47]], ATT:[[15,18],[50,12],[85,18]] },
-  "3-5-2": { GK:[[50,91]], CD:[[25,74],[50,77],[75,74]], MD:[[8,46],[30,49],[50,53],[70,49],[92,46]], ATT:[[38,17],[62,17]] },
-  "4-2-3-1": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[38,57],[62,57],[20,34],[50,38],[80,34]], ATT:[[50,12]] },
-  "5-3-2": { GK:[[50,91]], CD:[[8,70],[29,75],[50,78],[71,75],[92,70]], MD:[[25,46],[50,50],[75,46]], ATT:[[38,17],[62,17]] },
+  "4-4-2": {
+    GK: [[50, 91]],
+    CD: [
+      [12, 72],
+      [38, 75],
+      [62, 75],
+      [88, 72],
+    ],
+    MD: [
+      [12, 44],
+      [38, 48],
+      [62, 48],
+      [88, 44],
+    ],
+    ATT: [
+      [38, 17],
+      [62, 17],
+    ],
+  },
+  "4-3-3": {
+    GK: [[50, 91]],
+    CD: [
+      [12, 72],
+      [38, 75],
+      [62, 75],
+      [88, 72],
+    ],
+    MD: [
+      [25, 47],
+      [50, 51],
+      [75, 47],
+    ],
+    ATT: [
+      [15, 18],
+      [50, 12],
+      [85, 18],
+    ],
+  },
+  "3-5-2": {
+    GK: [[50, 91]],
+    CD: [
+      [25, 74],
+      [50, 77],
+      [75, 74],
+    ],
+    MD: [
+      [8, 46],
+      [30, 49],
+      [50, 53],
+      [70, 49],
+      [92, 46],
+    ],
+    ATT: [
+      [38, 17],
+      [62, 17],
+    ],
+  },
+  "4-2-3-1": {
+    GK: [[50, 91]],
+    CD: [
+      [12, 72],
+      [38, 75],
+      [62, 75],
+      [88, 72],
+    ],
+    MD: [
+      [38, 57],
+      [62, 57],
+      [20, 34],
+      [50, 38],
+      [80, 34],
+    ],
+    ATT: [[50, 12]],
+  },
+  "5-3-2": {
+    GK: [[50, 91]],
+    CD: [
+      [8, 70],
+      [29, 75],
+      [50, 78],
+      [71, 75],
+      [92, 70],
+    ],
+    MD: [
+      [25, 46],
+      [50, 50],
+      [75, 46],
+    ],
+    ATT: [
+      [38, 17],
+      [62, 17],
+    ],
+  },
 };
 
 function PitchPreview({ formation, players }) {
   const shape = FORMATION_PITCH[formation];
-  const groups = Object.fromEntries(["GK","CD","MD","ATT"].map(code => [code, players.filter(a => position(a) === code)]));
-  const slots = Object.entries(shape).flatMap(([code, coordinates]) => coordinates.map(([x,y], index) => ({ code, x, y, player: groups[code][index] })));
-  return <section className="pitch-section"><div className="section-head"><div><span className="eyebrow">Formation preview</span><h3>{formation}</h3></div><span className="results-count">{players.length}/11 placed</span></div><div className="football-pitch"><div className="pitch-halfway"/><div className="pitch-circle"/><div className="pitch-box top"/><div className="pitch-box bottom"/>{slots.map((slot,index) => <div className={`pitch-player${slot.player ? " filled" : ""}`} style={{ left:`${slot.x}%`, top:`${slot.y}%` }} key={`${slot.code}-${index}`}><span>{slot.player ? position(slot.player) : "+"}</span><strong>{slot.player ? name(slot.player).split(" ").slice(-1)[0] : slot.code}</strong>{slot.player && <small>{slot.player.player_seasons?.overall_rating || "—"}</small>}</div>)}</div><p className="pitch-help">Players are placed by their squad position and the selected formation. Change the order of your starters to adjust players within each line.</p></section>
+  const groups = Object.fromEntries(
+    ["GK", "CD", "MD", "ATT"].map((code) => [
+      code,
+      players.filter((a) => position(a) === code),
+    ]),
+  );
+  const slots = Object.entries(shape).flatMap(([code, coordinates]) =>
+    coordinates.map(([x, y], index) => ({
+      code,
+      x,
+      y,
+      player: groups[code][index],
+    })),
+  );
+  return (
+    <section className="pitch-section">
+      <div className="section-head">
+        <div>
+          <span className="eyebrow">Formation preview</span>
+          <h3>{formation}</h3>
+        </div>
+        <span className="results-count">{players.length}/11 placed</span>
+      </div>
+      <div className="football-pitch">
+        <div className="pitch-halfway" />
+        <div className="pitch-circle" />
+        <div className="pitch-box top" />
+        <div className="pitch-box bottom" />
+        {slots.map((slot, index) => (
+          <div
+            className={`pitch-player${slot.player ? " filled" : ""}`}
+            style={{ left: `${slot.x}%`, top: `${slot.y}%` }}
+            key={`${slot.code}-${index}`}
+          >
+            <span>{slot.player ? position(slot.player) : "+"}</span>
+            <strong>
+              {slot.player
+                ? name(slot.player).split(" ").slice(-1)[0]
+                : slot.code}
+            </strong>
+            {slot.player && (
+              <small>{slot.player.player_seasons?.overall_rating || "—"}</small>
+            )}
+          </div>
+        ))}
+      </div>
+      <p className="pitch-help">
+        Players are placed by their squad position and the selected formation.
+        Change the order of your starters to adjust players within each line.
+      </p>
+    </section>
+  );
 }
 
 function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
@@ -712,6 +849,32 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
     setBench((current) => current.filter((item) => item !== id));
     setLineupMessage("");
   }
+  function orderedIds(group, id) {
+    const list = group === "starter" ? starters : bench;
+    const selectedPlayer = players.find((a) => a.id === id);
+    return list.filter((itemId) => {
+      const item = players.find((a) => a.id === itemId);
+      return group === "starter"
+        ? position(item) === position(selectedPlayer)
+        : position(item) !== "GK";
+    });
+  }
+  function movePlayer(id, direction, group) {
+    const setList = group === "starter" ? setStarters : setBench;
+    setList((current) => {
+      const ordered = orderedIds(group, id);
+      const currentOrder = ordered.indexOf(id);
+      const otherId = ordered[currentOrder + direction];
+      if (!otherId) return current;
+      const next = [...current];
+      const from = next.indexOf(id),
+        to = next.indexOf(otherId);
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+    setSavedAt(null);
+    setLineupMessage("");
+  }
   async function saveDraft() {
     setSaving(true);
     setLineupMessage("");
@@ -763,28 +926,54 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
     );
     setLineupMessage(`${formation} lineup submitted successfully.`);
   }
-  const PlayerRow = ({ a, selected }) => (
-    <article className="lineup-player">
-      <div className="avatar">{position(a)}</div>
-      <div>
-        <strong>{name(a)}</strong>
-        <small>
-          {a.player_seasons?.clubs?.name} · Rating{" "}
-          {a.player_seasons?.overall_rating || "—"}
-        </small>
-      </div>
-      {selected ? (
-        <button className="lineup-remove" onClick={() => remove(a.id)}>
-          Remove
-        </button>
-      ) : (
-        <div className="lineup-actions">
-          <button onClick={() => assign(a, "start")}>Start</button>
-          <button onClick={() => assign(a, "bench")}>Bench</button>
+  const PlayerRow = ({ a, selected, group, priority }) => {
+    const order = selected ? orderedIds(group, a.id) : [];
+    const orderIndex = order.indexOf(a.id);
+    const reorderable = group === "starter" || position(a) !== "GK";
+    return (
+      <article className="lineup-player">
+        <div className="avatar">{position(a)}</div>
+        <div>
+          <strong>{name(a)}</strong>
+          <small>
+            {a.player_seasons?.clubs?.name} · Rating{" "}
+            {a.player_seasons?.overall_rating || "—"}
+          </small>
         </div>
-      )}
-    </article>
-  );
+        {priority && <span className="sub-priority">{priority}</span>}
+        {selected ? (
+          <div className="selected-player-actions">
+            {reorderable && (
+              <div className="order-buttons">
+                <button
+                  disabled={orderIndex <= 0}
+                  onClick={() => movePlayer(a.id, -1, group)}
+                  aria-label={`Move ${name(a)} up`}
+                >
+                  ↑
+                </button>
+                <button
+                  disabled={orderIndex >= order.length - 1}
+                  onClick={() => movePlayer(a.id, 1, group)}
+                  aria-label={`Move ${name(a)} down`}
+                >
+                  ↓
+                </button>
+              </div>
+            )}
+            <button className="lineup-remove" onClick={() => remove(a.id)}>
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="lineup-actions">
+            <button onClick={() => assign(a, "start")}>Start</button>
+            <button onClick={() => assign(a, "bench")}>Bench</button>
+          </div>
+        )}
+      </article>
+    );
+  };
 
   return (
     <section className="lineup-page">
@@ -884,7 +1073,7 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
           </div>
           <div className="lineup-list">
             {startingPlayers.map((a) => (
-              <PlayerRow key={a.id} a={a} selected />
+              <PlayerRow key={a.id} a={a} selected group="starter" />
             ))}
             {Array.from(
               { length: Math.max(0, 11 - startingPlayers.length) },
@@ -908,7 +1097,17 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
           </div>
           <div className="lineup-list">
             {benchPlayers.map((a) => (
-              <PlayerRow key={a.id} a={a} selected />
+              <PlayerRow
+                key={a.id}
+                a={a}
+                selected
+                group="bench"
+                priority={
+                  position(a) === "GK"
+                    ? "GK"
+                    : `Sub ${benchPlayers.filter((p) => position(p) !== "GK").findIndex((p) => p.id === a.id) + 1}`
+                }
+              />
             ))}
             {Array.from(
               { length: Math.max(0, 6 - benchPlayers.length) },
