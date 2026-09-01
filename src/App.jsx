@@ -308,8 +308,9 @@ function AuctionCard({
 
 function ClubHome({ season, club, auctions, onOpenAuctions }) {
   const winning = auctions.filter((a) => a.current_winner_club_id === club.id);
-  const positions = ["GK", "DEF", "MID", "FWD"].map((label) => ({
+  const positions = ["GK", "CD", "MD", "ATT"].map((label) => ({
     label,
+    display: { GK: "GK", CD: "DEF", MD: "MID", ATT: "ATT" }[label],
     count: winning.filter((a) => position(a) === label).length,
   }));
   const committed = Number(club.reserved_pence || 0);
@@ -365,7 +366,7 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
           <div className="position-balance">
             {positions.map((item) => (
               <div key={item.label}>
-                <span>{item.label}</span>
+                <span>{item.display}</span>
                 <strong>{item.count}</strong>
               </div>
             ))}
@@ -577,6 +578,10 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
   const [lineupMessage, setLineupMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  const [formation, setFormation] = useState(
+    () => localStorage.getItem("fantasy-formation") || "4-4-2",
+  );
+  const [submitting, setSubmitting] = useState(false);
   const playerIds = players.map((a) => a.id);
   const startingPlayers = starters
     .map((id) => players.find((a) => a.id === id))
@@ -600,6 +605,19 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
     startGoalkeepers === 1 &&
     benchPlayers.length === 6 &&
     benchGoalkeepers === 1;
+  const formationShape = {
+    "4-4-2": [4, 4, 2],
+    "4-3-3": [4, 3, 3],
+    "3-5-2": [3, 5, 2],
+    "4-2-3-1": [4, 5, 1],
+    "5-3-2": [5, 3, 2],
+  }[formation];
+  const starterShape = ["CD", "MD", "ATT"].map(
+    (code) => startingPlayers.filter((a) => position(a) === code).length,
+  );
+  const formationMatches = formationShape.every(
+    (count, index) => count === starterShape[index],
+  );
 
   useEffect(() => {
     const validStarters = starters.filter((id) => playerIds.includes(id)),
@@ -614,13 +632,17 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
     localStorage.setItem("fantasy-lineup-bench", JSON.stringify(bench));
   }, [bench]);
   useEffect(() => {
+    localStorage.setItem("fantasy-formation", formation);
+  }, [formation]);
+  useEffect(() => {
     if (!players.length) return;
     supabase.rpc("get_my_lineup_draft").then(({ data, error }) => {
       if (error) return setLineupMessage(error.message);
       const toAuctionIds = (ids) =>
         (ids || [])
-          .map((playerSeasonId) =>
-            players.find((a) => a.player_seasons?.id === playerSeasonId)?.id,
+          .map(
+            (playerSeasonId) =>
+              players.find((a) => a.player_seasons?.id === playerSeasonId)?.id,
           )
           .filter(Boolean);
       const remoteStarters = toAuctionIds(data?.starters);
@@ -692,7 +714,10 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
       p_bench: benchIds,
     });
     setSaving(false);
-    if (error) return setLineupMessage(error.message);
+    if (error) {
+      setLineupMessage(error.message);
+      return false;
+    }
     setSavedAt(
       new Date(data?.saved_at || Date.now()).toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -700,6 +725,28 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
       }),
     );
     setLineupMessage("Lineup draft saved to your club.");
+    return true;
+  }
+  async function submitLineup() {
+    if (!lineupComplete || !formationMatches) return;
+    setSubmitting(true);
+    const saved = await saveDraft();
+    if (!saved) {
+      setSubmitting(false);
+      return;
+    }
+    const { data, error } = await supabase.rpc("submit_my_lineup", {
+      p_formation: formation,
+    });
+    setSubmitting(false);
+    if (error) return setLineupMessage(error.message);
+    setSavedAt(
+      new Date(data?.submitted_at || Date.now()).toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
+    setLineupMessage(`${formation} lineup submitted successfully.`);
   }
   const PlayerRow = ({ a, selected }) => (
     <article className="lineup-player">
@@ -736,15 +783,64 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
           </p>
         </div>
         <div className="lineup-save-area">
+          <label className="formation-select">
+            Formation
+            <select
+              value={formation}
+              onChange={(e) => setFormation(e.target.value)}
+            >
+              {["4-4-2", "4-3-3", "3-5-2", "4-2-3-1", "5-3-2"].map((value) => (
+                <option key={value}>{value}</option>
+              ))}
+            </select>
+          </label>
           <div className={`lineup-status${lineupComplete ? " complete" : ""}`}>
-            <span>{lineupComplete ? "✓ Lineup ready" : `${startingPlayers.length + benchPlayers.length}/17 selected`}</span>
-            <small>{season?.first_match_at ? `Deadline ${new Date(season.first_match_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "Deadline to be announced"}</small>
+            <span>
+              {lineupComplete
+                ? "✓ Lineup ready"
+                : `${startingPlayers.length + benchPlayers.length}/17 selected`}
+            </span>
+            <small>
+              {season?.first_match_at
+                ? `Deadline ${new Date(season.first_match_at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                : "Deadline to be announced"}
+            </small>
           </div>
-          <button className="primary-btn" disabled={saving || !players.length} onClick={saveDraft}>{saving ? "Saving…" : "Save lineup"}</button>
+          <button
+            className="primary-btn"
+            disabled={saving || !players.length}
+            onClick={saveDraft}
+          >
+            {saving ? "Saving…" : "Save lineup"}
+          </button>
+          <button
+            className="submit-lineup-btn"
+            disabled={submitting || !lineupComplete || !formationMatches}
+            onClick={submitLineup}
+          >
+            {submitting ? "Submitting…" : "Submit lineup"}
+          </button>
+          {lineupComplete && !formationMatches && (
+            <small className="formation-error">
+              Need {formationShape[0]} defenders, {formationShape[1]}{" "}
+              midfielders and {formationShape[2]} attackers
+            </small>
+          )}
           {savedAt && <small className="saved-at">Saved: {savedAt}</small>}
         </div>
       </div>
-      {lineupMessage && <div className={lineupMessage.includes("saved") ? "lineup-success" : "lineup-warning"}>{lineupMessage}</div>}
+      {lineupMessage && (
+        <div
+          className={
+            lineupMessage.includes("saved") ||
+            lineupMessage.includes("submitted")
+              ? "lineup-success"
+              : "lineup-warning"
+          }
+        >
+          {lineupMessage}
+        </div>
+      )}
       {players.length < 17 && (
         <div className="lineup-notice">
           <div>
@@ -1183,8 +1279,15 @@ export default function App() {
                 onChange={(e) => setPositionFilter(e.target.value)}
               >
                 <option value="ALL">All positions</option>
-                {["GK", "DEF", "MID", "FWD"].map((item) => (
-                  <option key={item}>{item}</option>
+                {[
+                  { value: "GK", label: "Goalkeepers" },
+                  { value: "CD", label: "Defenders" },
+                  { value: "MD", label: "Midfielders" },
+                  { value: "ATT", label: "Attackers" },
+                ].map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
                 ))}
               </select>
               <select

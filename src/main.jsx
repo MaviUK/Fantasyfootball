@@ -7,6 +7,7 @@ import './dashboard.css'
 import './squad.css'
 import './lineup.css'
 import './saved-lineup.css'
+import './formation.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
