@@ -10,6 +10,7 @@ import './saved-lineup.css'
 import './formation.css'
 import './pitch.css'
 import './lineup-order.css'
+import './fixtures.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

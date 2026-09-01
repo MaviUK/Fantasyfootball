@@ -1149,12 +1149,116 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
   );
 }
 
+const fixtureDate = (value, includeTime = true) => {
+  if (!value) return "To be announced";
+  return new Date(value).toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(includeTime && { hour: "2-digit", minute: "2-digit" }),
+  });
+};
+
+function FixturesPage({ fixtures, loading }) {
+  const [filter, setFilter] = useState("upcoming");
+  const completed = (fixture) =>
+    fixture.home_goals !== null && fixture.home_goals !== undefined;
+  const nextFixture = fixtures.find((fixture) => !completed(fixture));
+  const visibleFixtures = fixtures.filter((fixture) =>
+    filter === "all"
+      ? true
+      : filter === "results"
+        ? completed(fixture)
+        : !completed(fixture),
+  );
+
+  if (loading)
+    return <div className="fixtures-loading">Loading your fixtures…</div>;
+
+  return (
+    <section className="fixtures-page">
+      {nextFixture && (
+        <div className="next-fixture">
+          <div className="next-fixture-copy">
+            <span className="eyebrow">Next match · Round {nextFixture.round_number}</span>
+            <h2>{nextFixture.venue === "home" ? "Home" : "Away"} vs {nextFixture.opponent_name}</h2>
+            <p>{fixtureDate(nextFixture.scheduled_at)} · {nextFixture.competition_type || "League"}</p>
+          </div>
+          <div className="deadline-card">
+            <span>Lineup deadline</span>
+            <strong>{fixtureDate(nextFixture.deadline_at)}</strong>
+            <small className={nextFixture.has_lineup ? "is-ready" : ""}>
+              {nextFixture.has_lineup ? "✓ Lineup submitted" : "Lineup not submitted"}
+            </small>
+          </div>
+        </div>
+      )}
+
+      <div className="fixtures-toolbar">
+        <div>
+          <span className="eyebrow">Season schedule</span>
+          <h2>Fixtures &amp; results</h2>
+        </div>
+        <div className="fixture-tabs" aria-label="Filter fixtures">
+          {[['upcoming', 'Upcoming'], ['results', 'Results'], ['all', 'All']].map(([value, label]) => (
+            <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value)}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      {visibleFixtures.length ? (
+        <div className="fixture-list">
+          {visibleFixtures.map((fixture) => {
+            const played = completed(fixture);
+            return (
+              <article className="fixture-card" key={fixture.id}>
+                <div className="fixture-meta">
+                  <span>Round {fixture.round_number}</span>
+                  <strong>{fixtureDate(fixture.scheduled_at, false)}</strong>
+                  <small>{fixture.scheduled_at ? new Date(fixture.scheduled_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "TBA"}</small>
+                </div>
+                <div className="fixture-teams">
+                  <div><span>Home</span><strong>{fixture.home_club_name}</strong></div>
+                  <div className={`fixture-score${played ? " played" : ""}`}>
+                    {played ? `${fixture.home_goals} – ${fixture.away_goals}` : "VS"}
+                  </div>
+                  <div className="away-team"><span>Away</span><strong>{fixture.away_club_name}</strong></div>
+                </div>
+                <div className="fixture-state">
+                  {played ? (
+                    <>
+                      <b className={`result-badge result-${fixture.result?.toLowerCase()}`}>{fixture.result}</b>
+                      <small>{fixture.home_shots ?? "—"}–{fixture.away_shots ?? "—"} shots · {fixture.home_xg ?? "—"}–{fixture.away_xg ?? "—"} xG</small>
+                    </>
+                  ) : (
+                    <>
+                      <b>{fixture.venue === "home" ? "Home" : "Away"}</b>
+                      <small>{fixture.has_lineup ? "Lineup ready" : `Deadline ${fixtureDate(fixture.deadline_at)}`}</small>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty-state fixtures-empty">
+          <strong>{fixtures.length ? `No ${filter} fixtures.` : "Fixtures have not been scheduled yet."}</strong>
+          <span>Your schedule will appear here when the season calendar is generated.</span>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null),
     [authReady, setAuthReady] = useState(false),
     [state, setState] = useState(null),
     [auctions, setAuctions] = useState([]),
     [loading, setLoading] = useState(true),
+    [fixtures, setFixtures] = useState([]),
+    [fixturesLoading, setFixturesLoading] = useState(false),
     [message, setMessage] = useState(""),
     [bid, setBid] = useState({}),
     [bidding, setBidding] = useState(null),
@@ -1196,6 +1300,11 @@ export default function App() {
     if (error) setMessage(error.message);
     setState(data);
     if (activeSession) {
+      setFixturesLoading(true);
+      const { data: fixtureItems, error: fixtureError } = await supabase.rpc("get_my_fixtures");
+      if (fixtureError) setMessage(fixtureError.message);
+      setFixtures(fixtureItems || []);
+      setFixturesLoading(false);
       const { data: items, error: auctionError } = await supabase
         .from("auctions")
         .select(
@@ -1388,6 +1497,8 @@ export default function App() {
                   ? "Provisional 17-player squad"
                   : view === "lineup"
                     ? "Starting XI and substitutes"
+                    : view === "fixtures"
+                      ? "Match schedule and results"
                     : "Day 1 auction room · prices update live"}
             </p>
           </div>
@@ -1419,6 +1530,12 @@ export default function App() {
             onClick={() => setView("lineup")}
           >
             Lineup
+          </button>
+          <button
+            className={view === "fixtures" ? "active" : ""}
+            onClick={() => setView("fixtures")}
+          >
+            Fixtures <span>{fixtures.length}</span>
           </button>
         </nav>
         <section className="stats-grid">
@@ -1470,6 +1587,8 @@ export default function App() {
             auctions={auctions}
             onOpenAuctions={() => setView("auctions")}
           />
+        ) : view === "fixtures" ? (
+          <FixturesPage fixtures={fixtures} loading={fixturesLoading} />
         ) : (
           <section className="section">
             <div className="section-head">
