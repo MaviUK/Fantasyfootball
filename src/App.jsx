@@ -12,6 +12,15 @@ const left = (date) => {
     ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
     : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
+const auctionStageStart = (season, stage) => season?.[`auction_day${stage}_start`];
+const auctionStageState = (season, stage) => {
+  const start = auctionStageStart(season, stage);
+  const end = stage < 4 ? auctionStageStart(season, stage + 1) : season?.fixed_price_start;
+  const now = Date.now();
+  if (!start || now < new Date(start).getTime()) return "upcoming";
+  if (!end || now < new Date(end).getTime()) return "live";
+  return "complete";
+};
 
 function AuthScreen() {
   const [email, setEmail] = useState(""),
@@ -199,7 +208,7 @@ function AuctionCard({
                 ? "Auction ended"
                 : watched
                   ? "★ Watching"
-                  : "Day 1"}
+                  : `Day ${a.stage}`}
           </span>
           <h3>{name(a)}</h3>
           <p>
@@ -1549,6 +1558,8 @@ export default function App() {
     [positionFilter, setPositionFilter] = useState("ALL"),
     [show, setShow] = useState("all"),
     [sort, setSort] = useState("ending"),
+    [auctionStage, setAuctionStage] = useState(1),
+    [auctionLoading, setAuctionLoading] = useState(false),
     [view, setView] = useState("home"),
     [watchlist, setWatchlist] = useState(() => {
       try {
@@ -1593,7 +1604,7 @@ export default function App() {
       if (tableError) setMessage(tableError.message);
       setLeagueTable(tableData || null);
       setLeagueLoading(false);
-      const { data: items, error: auctionError } = await supabase.rpc("get_auction_room", { p_stage: 1 });
+      const { data: items, error: auctionError } = await supabase.rpc("get_auction_room", { p_stage: auctionStage });
       if (auctionError) setMessage(auctionError.message);
       setAuctions(items || []);
     }
@@ -1611,6 +1622,16 @@ export default function App() {
     });
     if (error) setMessage(error.message);
     setHistory(data || []);
+  }
+  async function changeAuctionStage(stage) {
+    setAuctionStage(stage);
+    setAuctionLoading(true);
+    setSelected(null);
+    setHistory([]);
+    const { data, error } = await supabase.rpc("get_auction_room", { p_stage: stage });
+    if (error) setMessage(error.message);
+    setAuctions(data || []);
+    setAuctionLoading(false);
   }
   async function openPlayerProfile(playerSeasonId) {
     setPlayerProfile({});
@@ -1792,7 +1813,7 @@ export default function App() {
                       ? "Match schedule and results"
                       : view === "table"
                         ? "League position and season record"
-                    : "Day 1 auction room · prices update live"}
+                    : `Auction Day ${auctionStage} · prices update live`}
             </p>
           </div>
           <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>
@@ -1894,10 +1915,32 @@ export default function App() {
           <LeagueTablePage data={leagueTable} loading={leagueLoading} />
         ) : (
           <section className="section">
+            <div className="auction-stage-panel">
+              <div className="auction-stage-intro">
+                <span className="eyebrow">Four-day player draft</span>
+                <h2>Auction calendar</h2>
+                <p>New groups of unique player-season cards open each day.</p>
+              </div>
+              <div className="auction-stage-tabs">
+                {[1, 2, 3, 4].map((stage) => {
+                  const stageState = auctionStageState(season, stage);
+                  const start = auctionStageStart(season, stage);
+                  return <button key={stage} className={`${auctionStage === stage ? "active" : ""} ${stageState}`} onClick={() => changeAuctionStage(stage)}>
+                    <span>Day {stage}</span>
+                    <strong>{stageState === "live" ? "Live now" : stageState === "complete" ? "Complete" : start ? new Date(start).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "TBA"}</strong>
+                    <small>{stageState === "upcoming" && start ? `Opens ${new Date(start).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : stageState === "live" ? "Bidding open" : "Bidding closed"}</small>
+                  </button>;
+                })}
+              </div>
+              <div className={`active-stage-status ${auctionStageState(season, auctionStage)}`}>
+                <b>{auctionStageState(season, auctionStage) === "live" ? "● Live" : auctionStageState(season, auctionStage) === "complete" ? "✓ Complete" : "◷ Upcoming"}</b>
+                <span>{auctionStageState(season, auctionStage) === "live" ? `${left(auctionStage === 4 ? season?.fixed_price_start : auctionStageStart(season, auctionStage + 1))} remaining` : auctionStageState(season, auctionStage) === "upcoming" ? `Opens in ${left(auctionStageStart(season, auctionStage)).replace("Starts after first bid", "TBA")}` : "Winning bids have been settled into squads"}</span>
+              </div>
+            </div>
             <div className="section-head">
               <div>
                 <span className="eyebrow">Player market</span>
-                <h2>Live auctions</h2>
+                <h2>Day {auctionStage} player cards</h2>
               </div>
               <span className="results-count">
                 {visible.length} player{visible.length === 1 ? "" : "s"}
@@ -1965,7 +2008,7 @@ export default function App() {
                 </button>
               </div>
             </div>
-            {loading ? (
+            {loading || auctionLoading ? (
               <div className="empty-state">Refreshing auctions…</div>
             ) : visible.length ? (
               <div className="auction-grid">
