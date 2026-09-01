@@ -1,0 +1,8 @@
+.owned-badge { padding: 5px 8px; border-radius: 8px; color: #07120d; background: #74f0a7; font-size: 9px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+.availability-badge { padding: 5px 8px; border-radius: 8px; color: #74f0a7; background: rgba(116,240,167,.08); font-size: 9px; font-weight: 800; text-transform: capitalize; }
+.availability-badge.unavailable { color: #f0a6ad; background: rgba(217,92,104,.1); }
+.squad-list article { grid-template-columns: 48px minmax(130px,1fr) auto auto auto auto; }
+@media (max-width: 760px) {
+  .squad-list article { grid-template-columns: 44px 1fr auto; }
+  .availability-badge, .owned-badge, .provisional-badge, .squad-profile-btn { grid-column: 2 / -1; justify-self: start; }
+}

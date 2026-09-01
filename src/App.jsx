@@ -463,8 +463,7 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
   );
 }
 
-function ProvisionalSquad({ club, auctions, onOpenAuctions, onProfile }) {
-  const players = auctions.filter((a) => a.current_winner_club_id === club.id);
+function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
   const goalkeepers = players.filter((a) => position(a) === "GK");
   const outfield = players.filter((a) => position(a) !== "GK");
   const totalCost = players.reduce(
@@ -482,10 +481,10 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions, onProfile }) {
       <div className="squad-heading">
         <div>
           <span className="eyebrow">Provisional squad</span>
-          <h2>Build your 17</h2>
+          <h2>Your squad</h2>
           <p>
-            These are players you currently lead the bidding for. They only
-            become permanent squad members when their auctions close.
+            Permanent signings and auctions you currently lead, with live
+            availability for your next match.
           </p>
         </div>
         <button className="primary-btn" onClick={onOpenAuctions}>
@@ -563,12 +562,15 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions, onProfile }) {
                   </span>
                 </div>
                 <div className="squad-bid">
-                  <span>Leading bid</span>
+                  <span>{a.ownership_status === "owned" ? "Signed for" : "Leading bid"}</span>
                   <strong>
                     {money(a.current_price_pence || a.reserve_price_pence)}
                   </strong>
                 </div>
-                <div className="provisional-badge">Provisional</div>
+                <div className={`availability-badge ${a.injury_status !== "available" || a.suspension_matches ? "unavailable" : ""}`}>
+                  {a.suspension_matches ? `Suspended ${a.suspension_matches}` : a.injury_status !== "available" ? a.injury_status : `${Math.round(Number(a.fitness || 100))}% fit`}
+                </div>
+                <div className={a.ownership_status === "owned" ? "owned-badge" : "provisional-badge"}>{a.ownership_status === "owned" ? "Signed" : "Provisional"}</div>
                 <button className="squad-profile-btn" onClick={() => onProfile(a.player_seasons.id)}>Profile</button>
               </article>
             ))}
@@ -750,8 +752,7 @@ function PitchPreview({ formation, players }) {
   );
 }
 
-function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
-  const players = auctions.filter((a) => a.current_winner_club_id === club.id);
+function LineupPlanner({ season, players, onOpenAuctions }) {
   const [starters, setStarters] = useState(() => {
     try {
       return JSON.parse(
@@ -1529,6 +1530,7 @@ export default function App() {
     [authReady, setAuthReady] = useState(false),
     [state, setState] = useState(null),
     [auctions, setAuctions] = useState([]),
+    [squad, setSquad] = useState([]),
     [loading, setLoading] = useState(true),
     [fixtures, setFixtures] = useState([]),
     [fixturesLoading, setFixturesLoading] = useState(false),
@@ -1578,6 +1580,9 @@ export default function App() {
     if (error) setMessage(error.message);
     setState(data);
     if (activeSession) {
+      const { data: squadItems, error: squadError } = await supabase.rpc("get_my_squad");
+      if (squadError) setMessage(squadError.message);
+      setSquad(squadItems || []);
       setFixturesLoading(true);
       const { data: fixtureItems, error: fixtureError } = await supabase.rpc("get_my_fixtures");
       if (fixtureError) setMessage(fixtureError.message);
@@ -1819,7 +1824,7 @@ export default function App() {
             className={view === "squad" ? "active" : ""}
             onClick={() => setView("squad")}
           >
-            My Squad <span>{winning}/17</span>
+            My Squad <span>{squad.length}/17</span>
           </button>
           <button
             className={view === "lineup" ? "active" : ""}
@@ -1879,16 +1884,14 @@ export default function App() {
           />
         ) : view === "squad" ? (
           <ProvisionalSquad
-            club={club}
-            auctions={auctions}
+            players={squad}
             onOpenAuctions={() => setView("auctions")}
             onProfile={openPlayerProfile}
           />
         ) : view === "lineup" ? (
           <LineupPlanner
-            club={club}
             season={season}
-            auctions={auctions}
+            players={squad}
             onOpenAuctions={() => setView("auctions")}
           />
         ) : view === "tactics" ? (
