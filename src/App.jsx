@@ -153,6 +153,7 @@ function AuctionCard({
   watched,
   toggleWatch,
   availablePence,
+  onProfile,
 }) {
   const p = a.player_seasons,
     leading = a.current_winner_club_id === clubId,
@@ -280,6 +281,7 @@ function AuctionCard({
           {open ? "Hide history" : "Bid history"}
         </button>
       </div>
+      <button className="profile-link" onClick={() => onProfile(p.id)}>View full player profile →</button>
       {open && (
         <div className="bid-history">
           <strong>Recent bids</strong>
@@ -303,6 +305,44 @@ function AuctionCard({
         </div>
       )}
     </article>
+  );
+}
+
+function PlayerProfile({ data, loading, error, onClose }) {
+  const attributes = data?.simulation_attributes || {};
+  const components = data?.rating_components || {};
+  const meters = Object.entries(attributes).filter(([, value]) => Number.isFinite(Number(value))).slice(0, 8);
+  const ratingParts = Object.entries(components).filter(([, value]) => Number.isFinite(Number(value))).slice(0, 6);
+  const historicalStats = data ? [
+    ["Apps", data.appearances], ["Starts", data.starts], ["Minutes", data.minutes], ["Goals", data.goals], ["Assists", data.assists],
+    ...(data.game_position === "GK" ? [["Clean sheets", data.clean_sheets], ["Saves", data.saves], ["Conceded", data.goals_conceded]] : [["Yellow", data.yellow_cards], ["Red", data.red_cards]]),
+  ] : [];
+  return (
+    <div className="profile-backdrop" onClick={onClose}>
+      <section className="player-profile" role="dialog" aria-modal="true" aria-label="Player profile" onClick={(e) => e.stopPropagation()}>
+        <button className="profile-close" onClick={onClose} aria-label="Close player profile">×</button>
+        {loading ? <div className="profile-loading">Loading player profile…</div> : error ? <div className="profile-error"><strong>Could not load this player.</strong><span>{error}</span></div> : data && <>
+          <header className="profile-hero">
+            <div className="profile-rating"><strong>{Math.round(Number(data.overall_rating || 0))}</strong><span>{data.game_position}</span></div>
+            <div><span className="eyebrow">{data.season_label} · {data.competition_name}</span><h2>{data.full_name}</h2><p>{data.club_name} · {data.historical_position || data.game_position}{data.age ? ` · Age ${data.age}` : ""}{data.nationality_code ? ` · ${data.nationality_code}` : ""}</p></div>
+            <div className="profile-value"><span>Card value</span><strong>{money(data.market_value_pence)}</strong><small>{Math.round(Number(data.data_confidence || 0) * 100)}% data confidence</small></div>
+          </header>
+          <div className="profile-body">
+            <div className="profile-main">
+              <div className="profile-section-title"><span className="eyebrow">Historical season</span><h3>{data.season_label} performance</h3></div>
+              <div className="profile-stat-grid">{historicalStats.map(([label, value]) => <div key={label}><span>{label}</span><strong>{Number(value || 0).toLocaleString()}</strong></div>)}</div>
+              {!!meters.length && <><div className="profile-section-title"><span className="eyebrow">Match engine</span><h3>Simulation attributes</h3></div><div className="attribute-list">{meters.map(([label, value]) => <div key={label}><div><span>{label.replaceAll("_", " ")}</span><strong>{Math.round(Number(value))}</strong></div><i><b style={{ width: `${Math.min(100, Number(value))}%` }} /></i></div>)}</div></>}
+            </div>
+            <aside className="profile-sidebar">
+              <span className="eyebrow">Fantasy career</span><h3>Current game record</h3>
+              <div className="game-record"><div><strong>{data.game_stats.appearances}</strong><span>Apps</span></div><div><strong>{data.game_stats.goals}</strong><span>Goals</span></div><div><strong>{data.game_stats.assists}</strong><span>Assists</span></div><div><strong>{data.game_stats.average_rating || "—"}</strong><span>Avg rating</span></div></div>
+              {!!ratingParts.length && <div className="rating-breakdown"><h4>Rating breakdown</h4>{ratingParts.map(([label, value]) => <div key={label}><span>{label.replaceAll("_", " ")}</span><b>{Number(value).toFixed(1)}</b></div>)}</div>}
+              <div className="profile-fitness"><div><span>Stamina</span><strong>{Math.round(Number(data.stamina_rating || 0))}</strong></div><div><span>Injury risk</span><strong>{Math.round(Number(data.injury_proneness || 0))}</strong></div></div>
+            </aside>
+          </div>
+        </>}
+      </section>
+    </div>
   );
 }
 
@@ -423,7 +463,7 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
   );
 }
 
-function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
+function ProvisionalSquad({ club, auctions, onOpenAuctions, onProfile }) {
   const players = auctions.filter((a) => a.current_winner_club_id === club.id);
   const goalkeepers = players.filter((a) => position(a) === "GK");
   const outfield = players.filter((a) => position(a) !== "GK");
@@ -529,6 +569,7 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
                   </strong>
                 </div>
                 <div className="provisional-badge">Provisional</div>
+                <button className="squad-profile-btn" onClick={() => onProfile(a.player_seasons.id)}>Profile</button>
               </article>
             ))}
             {Array.from(
@@ -1493,6 +1534,9 @@ export default function App() {
     [fixturesLoading, setFixturesLoading] = useState(false),
     [leagueTable, setLeagueTable] = useState(null),
     [leagueLoading, setLeagueLoading] = useState(false),
+    [playerProfile, setPlayerProfile] = useState(null),
+    [profileLoading, setProfileLoading] = useState(false),
+    [profileError, setProfileError] = useState(""),
     [message, setMessage] = useState(""),
     [bid, setBid] = useState({}),
     [bidding, setBidding] = useState(null),
@@ -1570,6 +1614,15 @@ export default function App() {
     });
     if (error) setMessage(error.message);
     setHistory(data || []);
+  }
+  async function openPlayerProfile(playerSeasonId) {
+    setPlayerProfile({});
+    setProfileLoading(true);
+    setProfileError("");
+    const { data, error } = await supabase.rpc("get_player_profile", { p_player_season_id: playerSeasonId });
+    setProfileLoading(false);
+    if (error) return setProfileError(error.message);
+    setPlayerProfile(data);
   }
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -1829,6 +1882,7 @@ export default function App() {
             club={club}
             auctions={auctions}
             onOpenAuctions={() => setView("auctions")}
+            onProfile={openPlayerProfile}
           />
         ) : view === "lineup" ? (
           <LineupPlanner
@@ -1937,6 +1991,7 @@ export default function App() {
                     watched={watchlist.includes(a.id)}
                     toggleWatch={() => toggleWatch(a.id)}
                     availablePence={available}
+                    onProfile={openPlayerProfile}
                   />
                 ))}
               </div>
@@ -1948,6 +2003,7 @@ export default function App() {
             )}
           </section>
         )}
+        {playerProfile && <PlayerProfile data={playerProfile} loading={profileLoading} error={profileError} onClose={() => setPlayerProfile(null)} />}
         {message && (
           <div className="config-banner toast" role="status">
             <span>{message}</span>
