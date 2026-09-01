@@ -1159,8 +1159,99 @@ const fixtureDate = (value, includeTime = true) => {
   });
 };
 
+const eventLabel = (event) => {
+  const labels = {
+    goal: "Goal",
+    yellow_card: "Yellow card",
+    red_card: "Red card",
+    substitution: "Substitution",
+    injury: "Injury",
+    missed_penalty: "Penalty missed",
+  };
+  return labels[event.event_type] || event.event_type?.replaceAll("_", " ") || "Match event";
+};
+
+function MatchCentre({ data, loading, error, onClose }) {
+  const fixture = data?.fixture;
+  const match = data?.simulation;
+  const events = data?.events || [];
+  const explanation = match?.explanation;
+  const summary = typeof explanation === "string"
+    ? explanation
+    : explanation?.summary || explanation?.narrative || explanation?.key_factor;
+  const stats = match ? [
+    ["Possession", match.home_possession, match.away_possession, "%"],
+    ["Shots", match.home_shots, match.away_shots],
+    ["Shots on target", match.home_shots_on_target, match.away_shots_on_target],
+    ["Expected goals", match.home_xg, match.away_xg],
+    ["Corners", match.home_corners, match.away_corners],
+    ["Fouls", match.home_fouls, match.away_fouls],
+    ["Yellow cards", match.home_yellow, match.away_yellow],
+    ["Red cards", match.home_red, match.away_red],
+  ] : [];
+
+  return (
+    <div className="match-modal-backdrop" onClick={onClose}>
+      <section className="match-centre" role="dialog" aria-modal="true" aria-label="Match centre" onClick={(e) => e.stopPropagation()}>
+        <button className="match-close" onClick={onClose} aria-label="Close match centre">×</button>
+        {loading ? <div className="match-loading">Loading match centre…</div> : error ? (
+          <div className="match-error"><strong>Could not load this match.</strong><span>{error}</span></div>
+        ) : match ? (
+          <>
+            <header className="match-header">
+              <span className="eyebrow">Full time · Round {fixture.round_number}</span>
+              <small>{fixtureDate(fixture.scheduled_at)}</small>
+              <div className="match-scoreboard">
+                <strong>{fixture.home_club_name}</strong>
+                <b>{match.home_goals} <i>–</i> {match.away_goals}</b>
+                <strong>{fixture.away_club_name}</strong>
+              </div>
+            </header>
+            <div className="match-content">
+              <div className="match-main">
+                <div className="match-section-head"><span className="eyebrow">Match statistics</span><h3>How the game unfolded</h3></div>
+                <div className="match-stats">
+                  {stats.map(([label, home, away, suffix = ""]) => {
+                    const total = Number(home || 0) + Number(away || 0);
+                    const width = total ? (Number(home || 0) / total) * 100 : 50;
+                    return <div className="match-stat" key={label}>
+                      <div><strong>{home ?? "—"}{home !== null && home !== undefined ? suffix : ""}</strong><span>{label}</span><strong>{away ?? "—"}{away !== null && away !== undefined ? suffix : ""}</strong></div>
+                      <div className="stat-track"><i style={{ width: `${width}%` }} /></div>
+                    </div>;
+                  })}
+                </div>
+                {summary && <div className="match-report"><span className="eyebrow">Match report</span><p>{summary}</p></div>}
+              </div>
+              <aside className="match-timeline">
+                <div className="match-section-head"><span className="eyebrow">Timeline</span><h3>Key events</h3></div>
+                {events.length ? events.map((event) => (
+                  <div className={`timeline-event ${event.club_id === fixture.home_club_id ? "home-event" : "away-event"}`} key={event.id}>
+                    <b>{event.minute}'</b><div><strong>{eventLabel(event)}</strong><span>{event.player_name || "Team event"}{event.related_player_name ? ` · ${event.related_player_name}` : ""}</span></div>
+                  </div>
+                )) : <div className="timeline-empty">No individual match events were recorded.</div>}
+              </aside>
+            </div>
+          </>
+        ) : <div className="match-error"><strong>Match data is not available yet.</strong><span>The full report will appear after the simulation completes.</span></div>}
+      </section>
+    </div>
+  );
+}
+
 function FixturesPage({ fixtures, loading }) {
   const [filter, setFilter] = useState("upcoming");
+  const [matchCentre, setMatchCentre] = useState(null);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState("");
+  async function openMatch(fixtureId) {
+    setMatchCentre({});
+    setMatchLoading(true);
+    setMatchError("");
+    const { data, error } = await supabase.rpc("get_my_match_centre", { p_fixture_id: fixtureId });
+    setMatchLoading(false);
+    if (error) return setMatchError(error.message);
+    setMatchCentre(data);
+  }
   const completed = (fixture) =>
     fixture.home_goals !== null && fixture.home_goals !== undefined;
   const nextFixture = fixtures.find((fixture) => !completed(fixture));
@@ -1229,6 +1320,7 @@ function FixturesPage({ fixtures, loading }) {
                     <>
                       <b className={`result-badge result-${fixture.result?.toLowerCase()}`}>{fixture.result}</b>
                       <small>{fixture.home_shots ?? "—"}–{fixture.away_shots ?? "—"} shots · {fixture.home_xg ?? "—"}–{fixture.away_xg ?? "—"} xG</small>
+                      <button className="match-centre-btn" onClick={() => openMatch(fixture.id)}>Match centre</button>
                     </>
                   ) : (
                     <>
@@ -1247,6 +1339,7 @@ function FixturesPage({ fixtures, loading }) {
           <span>Your schedule will appear here when the season calendar is generated.</span>
         </div>
       )}
+      {matchCentre && <MatchCentre data={matchCentre} loading={matchLoading} error={matchError} onClose={() => setMatchCentre(null)} />}
     </section>
   );
 }
