@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './styles.css'
 import './auction-room.css'
 import './dashboard.css'
+import './squad.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -386,6 +386,19 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
   );
 }
 
+function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
+  const players = auctions.filter(a => a.current_winner_club_id === club.id)
+  const goalkeepers = players.filter(a => position(a) === "GK")
+  const outfield = players.filter(a => position(a) !== "GK")
+  const totalCost = players.reduce((sum, a) => sum + Number(a.current_price_pence || a.reserve_price_pence || 0), 0)
+  const slots = [
+    { label: "Goalkeepers", players: goalkeepers, required: 2 },
+    { label: "Outfield players", players: outfield, required: 15 },
+  ]
+
+  return <section className="squad-page"><div className="squad-heading"><div><span className="eyebrow">Provisional squad</span><h2>Build your 17</h2><p>These are players you currently lead the bidding for. They only become permanent squad members when their auctions close.</p></div><button className="primary-btn" onClick={onOpenAuctions}>Find players</button></div><div className="squad-progress"><div><span>Total players</span><strong>{players.length}<small>/17</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, players.length / 17 * 100)}%` }} /></div></div><div><span>Goalkeepers</span><strong>{goalkeepers.length}<small>/2</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, goalkeepers.length / 2 * 100)}%` }} /></div></div><div><span>Outfield</span><strong>{outfield.length}<small>/15</small></strong><div className="squad-track"><i style={{ width: `${Math.min(100, outfield.length / 15 * 100)}%` }} /></div></div><div><span>Provisional cost</span><strong>{money(totalCost)}</strong><small>Current leading bids</small></div></div>{slots.map(group => <div className="squad-group" key={group.label}><div className="section-head"><div><span className="eyebrow">{group.players.length} of {group.required}</span><h3>{group.label}</h3></div></div><div className="squad-list">{group.players.map(a => <article key={a.id}><div className="avatar">{position(a)}</div><div className="squad-player"><strong>{name(a)}</strong><span>{a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</span></div><div className="squad-bid"><span>Leading bid</span><strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong></div><div className="provisional-badge">Provisional</div></article>)}{Array.from({ length: Math.max(0, group.required - group.players.length) }, (_, index) => <button className="empty-squad-slot" key={`empty-${index}`} onClick={onOpenAuctions}><span>+</span><div><strong>Empty slot</strong><small>Find a {group.label === "Goalkeepers" ? "goalkeeper" : "player"}</small></div></button>)}</div></div>)}</section>
+}
+
 export default function App() {
   const [session, setSession] = useState(null),
     [authReady, setAuthReady] = useState(false),
@@ -593,7 +606,9 @@ export default function App() {
             <p>
               {view === "home"
                 ? "Club headquarters"
-                : "Day 1 auction room · prices update live"}
+                : view === "squad"
+                  ? "Provisional 17-player squad"
+                  : "Day 1 auction room · prices update live"}
             </p>
           </div>
           <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>
@@ -612,6 +627,12 @@ export default function App() {
             onClick={() => setView("auctions")}
           >
             Auctions <span>{auctions.length}</span>
+          </button>
+          <button
+            className={view === "squad" ? "active" : ""}
+            onClick={() => setView("squad")}
+          >
+            My Squad <span>{winning}/17</span>
           </button>
         </nav>
         <section className="stats-grid">
@@ -650,6 +671,8 @@ export default function App() {
             auctions={auctions}
             onOpenAuctions={() => setView("auctions")}
           />
+        ) : view === "squad" ? (
+          <ProvisionalSquad club={club} auctions={auctions} onOpenAuctions={() => setView("auctions")} />
         ) : (
           <section className="section">
             <div className="section-head">
