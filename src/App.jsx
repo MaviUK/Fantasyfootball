@@ -213,7 +213,7 @@ function AuctionCard({
           </span>
           <h3>{name(a)}</h3>
           <p>
-            {p?.clubs?.name} · {position(a)} · Rating {p?.overall_rating || "—"}
+            {p?.clubs?.name} · {p?.season_label || "Season unknown"} · {positionLabel(a)} · Rating {p?.overall_rating || "—"}
           </p>
         </div>
       </div>
@@ -1557,11 +1557,13 @@ export default function App() {
     [history, setHistory] = useState([]),
     [query, setQuery] = useState(""),
     [positionFilter, setPositionFilter] = useState("ALL"),
+    [seasonFilter, setSeasonFilter] = useState("ALL"),
     [show, setShow] = useState("all"),
     [sort, setSort] = useState("ending"),
     [marketView, setMarketView] = useState("list"),
     [expandedAuction, setExpandedAuction] = useState(null),
     [auctionStage, setAuctionStage] = useState(0),
+    [auctionTotal, setAuctionTotal] = useState(0),
     [auctionLoading, setAuctionLoading] = useState(false),
     [view, setView] = useState("home"),
     [watchlist, setWatchlist] = useState(() => {
@@ -1618,6 +1620,7 @@ export default function App() {
       const { data: items, error: auctionError } = await fetchAuctionPlayers(auctionStage);
       if (auctionError) setMessage(auctionError.message);
       setAuctions(items || []);
+      if (auctionStage === 0) setAuctionTotal((items || []).length);
     }
     setLoading(false);
   }
@@ -1642,6 +1645,7 @@ export default function App() {
     const { data, error } = await fetchAuctionPlayers(stage);
     if (error) setMessage(error.message);
     setAuctions(data || []);
+    if (stage === 0) setAuctionTotal((data || []).length);
     setAuctionLoading(false);
   }
   async function openPlayerProfile(playerSeasonId) {
@@ -1748,8 +1752,10 @@ export default function App() {
               name(a).toLowerCase().includes(q) ||
               (a.player_seasons?.clubs?.name || "")
                 .toLowerCase()
-                .includes(q)) &&
+                .includes(q) ||
+              (a.player_seasons?.season_label || "").toLowerCase().includes(q)) &&
             (positionFilter === "ALL" || position(a) === positionFilter) &&
+            (seasonFilter === "ALL" || a.player_seasons?.season_label === seasonFilter) &&
             (show === "all" ||
               (show === "winning" &&
                 a.current_winner_club_id === state?.club?.id) ||
@@ -1785,6 +1791,7 @@ export default function App() {
       auctions,
       query,
       positionFilter,
+      seasonFilter,
       show,
       sort,
       state?.club?.id,
@@ -1792,6 +1799,7 @@ export default function App() {
       tick,
     ],
   );
+  const availableSeasons = [...new Set(auctions.map((a) => a.player_seasons?.season_label).filter(Boolean))].sort().reverse();
   if (!authReady)
     return <div className="loading-screen">Loading Fantasy Football…</div>;
   if (!session) return <AuthScreen />;
@@ -1895,9 +1903,9 @@ export default function App() {
           </div>
           <div className="stat-card">
             <div>
-              <span>Day 1 cards</span>
+              <span>Market cards</span>
               <strong>{auctions.length}</strong>
-              <small>Prices update live</small>
+              <small>Across selected auction days</small>
             </div>
           </div>
         </section>
@@ -1936,7 +1944,7 @@ export default function App() {
               </div>
               <div className="auction-stage-tabs">
                 <button className={auctionStage === 0 ? "active all-players" : "all-players"} onClick={() => changeAuctionStage(0)}>
-                  <span>Full market</span><strong>All players</strong><small>537 cards</small>
+                  <span>Full market</span><strong>All players</strong><small>{auctionTotal || auctions.length} cards</small>
                 </button>
                 {[1, 2, 3, 4].map((stage) => {
                   const stageState = auctionStageState(season, stage);
@@ -1949,7 +1957,7 @@ export default function App() {
                 })}
               </div>
               <div className={`active-stage-status ${auctionStage === 0 ? "all" : auctionStageState(season, auctionStage)}`}>
-                {auctionStage === 0 ? <><b>537 player cards</b><span>Use the position filters below or choose an auction day</span></> : <><b>{auctionStageState(season, auctionStage) === "live" ? "● Live" : auctionStageState(season, auctionStage) === "complete" ? "✓ Complete" : "◷ Upcoming"}</b><span>{auctionStageState(season, auctionStage) === "live" ? `${left(auctionStage === 4 ? season?.fixed_price_start : auctionStageStart(season, auctionStage + 1))} remaining` : auctionStageState(season, auctionStage) === "upcoming" ? `Opens in ${left(auctionStageStart(season, auctionStage)).replace("Starts after first bid", "TBA")}` : "Winning bids have been settled into squads"}</span></>}
+                {auctionStage === 0 ? <><b>{auctionTotal || auctions.length} player-season cards</b><span>Use the season and position filters below or choose an auction day</span></> : <><b>{auctionStageState(season, auctionStage) === "live" ? "● Live" : auctionStageState(season, auctionStage) === "complete" ? "✓ Complete" : "◷ Upcoming"}</b><span>{auctionStageState(season, auctionStage) === "live" ? `${left(auctionStage === 4 ? season?.fixed_price_start : auctionStageStart(season, auctionStage + 1))} remaining` : auctionStageState(season, auctionStage) === "upcoming" ? `Opens in ${left(auctionStageStart(season, auctionStage)).replace("Starts after first bid", "TBA")}` : "Winning bids have been settled into squads"}</span></>}
               </div>
             </div>
             <div className="section-head">
@@ -1987,6 +1995,10 @@ export default function App() {
                     {item.label}
                   </option>
                 ))}
+              </select>
+              <select aria-label="Filter by historical season" value={seasonFilter} onChange={(e) => setSeasonFilter(e.target.value)}>
+                <option value="ALL">All seasons</option>
+                {availableSeasons.map((seasonLabel) => <option key={seasonLabel} value={seasonLabel}>{seasonLabel}</option>)}
               </select>
               <select
                 aria-label="Sort auctions"
@@ -2069,7 +2081,7 @@ export default function App() {
                   const leading = a.current_winner_club_id === club.id;
                   return <article className={`auction-list-item${isExpanded ? " expanded" : ""}`} key={a.id}>
                     <button className="auction-list-row" onClick={() => setExpandedAuction(isExpanded ? null : a.id)} aria-expanded={isExpanded}>
-                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)}</strong><small>{positionLabel(a)} · {a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
+                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)} <em>{a.player_seasons?.season_label}</em></strong><small>{positionLabel(a)} · {a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
                       <b>{positionLabel(a)}</b>
                       <strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong>
                       <span className={leading ? "list-winning" : `list-${a.status}`}>{leading ? "Winning" : a.status}</span>
