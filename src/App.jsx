@@ -557,6 +557,21 @@ function ProvisionalSquad({ club, auctions, onOpenAuctions }) {
   );
 }
 
+const FORMATION_PITCH = {
+  "4-4-2": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[12,44],[38,48],[62,48],[88,44]], ATT:[[38,17],[62,17]] },
+  "4-3-3": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[25,47],[50,51],[75,47]], ATT:[[15,18],[50,12],[85,18]] },
+  "3-5-2": { GK:[[50,91]], CD:[[25,74],[50,77],[75,74]], MD:[[8,46],[30,49],[50,53],[70,49],[92,46]], ATT:[[38,17],[62,17]] },
+  "4-2-3-1": { GK:[[50,91]], CD:[[12,72],[38,75],[62,75],[88,72]], MD:[[38,57],[62,57],[20,34],[50,38],[80,34]], ATT:[[50,12]] },
+  "5-3-2": { GK:[[50,91]], CD:[[8,70],[29,75],[50,78],[71,75],[92,70]], MD:[[25,46],[50,50],[75,46]], ATT:[[38,17],[62,17]] },
+};
+
+function PitchPreview({ formation, players }) {
+  const shape = FORMATION_PITCH[formation];
+  const groups = Object.fromEntries(["GK","CD","MD","ATT"].map(code => [code, players.filter(a => position(a) === code)]));
+  const slots = Object.entries(shape).flatMap(([code, coordinates]) => coordinates.map(([x,y], index) => ({ code, x, y, player: groups[code][index] })));
+  return <section className="pitch-section"><div className="section-head"><div><span className="eyebrow">Formation preview</span><h3>{formation}</h3></div><span className="results-count">{players.length}/11 placed</span></div><div className="football-pitch"><div className="pitch-halfway"/><div className="pitch-circle"/><div className="pitch-box top"/><div className="pitch-box bottom"/>{slots.map((slot,index) => <div className={`pitch-player${slot.player ? " filled" : ""}`} style={{ left:`${slot.x}%`, top:`${slot.y}%` }} key={`${slot.code}-${index}`}><span>{slot.player ? position(slot.player) : "+"}</span><strong>{slot.player ? name(slot.player).split(" ").slice(-1)[0] : slot.code}</strong>{slot.player && <small>{slot.player.player_seasons?.overall_rating || "—"}</small>}</div>)}</div><p className="pitch-help">Players are placed by their squad position and the selected formation. Change the order of your starters to adjust players within each line.</p></section>
+}
+
 function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
   const players = auctions.filter((a) => a.current_winner_club_id === club.id);
   const [starters, setStarters] = useState(() => {
@@ -855,6 +870,7 @@ function LineupPlanner({ club, season, auctions, onOpenAuctions }) {
           </button>
         </div>
       )}
+      <PitchPreview formation={formation} players={startingPlayers} />
       <div className="lineup-columns">
         <div className="lineup-column">
           <div className="lineup-column-head">
