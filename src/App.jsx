@@ -1159,6 +1159,85 @@ const fixtureDate = (value, includeTime = true) => {
   });
 };
 
+const tacticGroups = [
+  { key: "mentality", label: "Mentality", description: "Your overall risk and attacking intent.", options: [["very_defensive", "Very defensive"], ["defensive", "Defensive"], ["balanced", "Balanced"], ["attacking", "Attacking"], ["very_attacking", "Very attacking"]] },
+  { key: "tempo", label: "Tempo", description: "How quickly your team moves the ball.", options: [["slow", "Slow"], ["balanced", "Balanced"], ["fast", "Fast"]] },
+  { key: "passing_style", label: "Passing", description: "How your team progresses possession.", options: [["short", "Short"], ["mixed", "Mixed"], ["direct", "Direct"]] },
+  { key: "pressing", label: "Pressing", description: "How aggressively players close down opponents.", options: [["low", "Low block"], ["balanced", "Balanced"], ["high", "High press"]] },
+  { key: "width", label: "Team width", description: "Where your team concentrates its play.", options: [["narrow", "Narrow"], ["balanced", "Balanced"], ["wide", "Wide"]] },
+  { key: "defensive_line", label: "Defensive line", description: "How high your defenders hold their position.", options: [["deep", "Deep"], ["balanced", "Balanced"], ["high", "High"]] },
+];
+
+function TacticsPage({ season }) {
+  const defaults = { mentality: "balanced", tempo: "balanced", pressing: "balanced", width: "balanced", defensive_line: "balanced", passing_style: "mixed" };
+  const [tactics, setTactics] = useState(defaults);
+  const [hasLineup, setHasLineup] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    supabase.rpc("get_my_tactics").then(({ data, error }) => {
+      if (error) setMessage(error.message);
+      if (data) {
+        setTactics(Object.fromEntries(Object.keys(defaults).map((key) => [key, data[key] || defaults[key]])));
+        setHasLineup(data.has_lineup);
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  async function saveTactics() {
+    setSaving(true);
+    setMessage("");
+    const { data, error } = await supabase.rpc("save_my_tactics", {
+      p_mentality: tactics.mentality,
+      p_tempo: tactics.tempo,
+      p_pressing: tactics.pressing,
+      p_width: tactics.width,
+      p_defensive_line: tactics.defensive_line,
+      p_passing_style: tactics.passing_style,
+    });
+    setSaving(false);
+    if (error) return setMessage(error.message);
+    setMessage(`Tactics saved at ${new Date(data.saved_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}.`);
+  }
+
+  if (loading) return <div className="tactics-loading">Loading your tactics…</div>;
+  const styleName = tactics.mentality.includes("attacking") ? "Front-foot football" : tactics.mentality.includes("defensive") ? "Compact counterattack" : tactics.tempo === "fast" ? "High-tempo control" : "Balanced control";
+  return (
+    <section className="tactics-page">
+      <div className="tactics-heading">
+        <div><span className="eyebrow">Match preparation</span><h2>Team tactics</h2><p>Set the playing style the match engine will use with your selected lineup.</p></div>
+        <div className="tactics-save">
+          <small>{season?.first_match_at ? `Deadline ${fixtureDate(season.first_match_at)}` : "Deadline to be announced"}</small>
+          <button className="primary-btn" disabled={saving || !hasLineup} onClick={saveTactics}>{saving ? "Saving…" : "Save tactics"}</button>
+        </div>
+      </div>
+      {!hasLineup && <div className="tactics-warning"><strong>Save your lineup first.</strong><span>Tactics are attached to your current team selection.</span></div>}
+      {message && <div className={message.includes("saved") ? "tactics-success" : "tactics-warning"}>{message}</div>}
+      <div className="tactics-layout">
+        <div className="tactics-groups">
+          {tacticGroups.map((group) => (
+            <article className="tactic-group" key={group.key}>
+              <div><h3>{group.label}</h3><p>{group.description}</p></div>
+              <div className="tactic-options">
+                {group.options.map(([value, label]) => <button key={value} className={tactics[group.key] === value ? "active" : ""} onClick={() => { setTactics((current) => ({ ...current, [group.key]: value })); setMessage(""); }}>{label}</button>)}
+              </div>
+            </article>
+          ))}
+        </div>
+        <aside className="tactics-summary">
+          <span className="eyebrow">Tactical identity</span><h3>{styleName}</h3>
+          <div className="tactic-board"><i className="line forwards" /><i className="line midfield" /><i className="line defence" /></div>
+          <dl>{tacticGroups.map((group) => <div key={group.key}><dt>{group.label}</dt><dd>{group.options.find(([value]) => value === tactics[group.key])?.[1]}</dd></div>)}</dl>
+          <p>More aggressive settings can create chances but increase fatigue and leave space for opponents.</p>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 const eventLabel = (event) => {
   const labels = {
     goal: "Goal",
@@ -1657,6 +1736,8 @@ export default function App() {
                   ? "Provisional 17-player squad"
                   : view === "lineup"
                     ? "Starting XI and substitutes"
+                    : view === "tactics"
+                      ? "Match strategy and playing style"
                     : view === "fixtures"
                       ? "Match schedule and results"
                       : view === "table"
@@ -1693,6 +1774,7 @@ export default function App() {
           >
             Lineup
           </button>
+          <button className={view === "tactics" ? "active" : ""} onClick={() => setView("tactics")}>Tactics</button>
           <button
             className={view === "fixtures" ? "active" : ""}
             onClick={() => setView("fixtures")}
@@ -1755,6 +1837,8 @@ export default function App() {
             auctions={auctions}
             onOpenAuctions={() => setView("auctions")}
           />
+        ) : view === "tactics" ? (
+          <TacticsPage season={season} />
         ) : view === "fixtures" ? (
           <FixturesPage fixtures={fixtures} loading={fixturesLoading} />
         ) : view === "table" ? (

@@ -13,6 +13,7 @@ import './lineup-order.css'
 import './fixtures.css'
 import './league-table.css'
 import './match-centre.css'
+import './tactics.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
