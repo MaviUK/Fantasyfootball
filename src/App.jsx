@@ -4,6 +4,7 @@ import { supabase } from "./lib/supabase.js";
 const money = (p) => `£${(Number(p || 0) / 100000000).toFixed(1)}m`;
 const name = (a) => a.player_seasons?.players?.full_name || "Player";
 const position = (a) => a.player_seasons?.game_position || "—";
+const positionLabel = (a) => ({ GK: "Goalkeeper", CD: "Defender", MD: "Midfielder", ATT: "Forward" })[position(a)] || position(a);
 const left = (date) => {
   if (!date) return "Starts after first bid";
   const seconds = Math.max(0, Math.floor((new Date(date) - Date.now()) / 1000));
@@ -1560,7 +1561,7 @@ export default function App() {
     [sort, setSort] = useState("ending"),
     [marketView, setMarketView] = useState("list"),
     [expandedAuction, setExpandedAuction] = useState(null),
-    [auctionStage, setAuctionStage] = useState(1),
+    [auctionStage, setAuctionStage] = useState(0),
     [auctionLoading, setAuctionLoading] = useState(false),
     [view, setView] = useState("home"),
     [watchlist, setWatchlist] = useState(() => {
@@ -1585,6 +1586,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("fantasy-watchlist", JSON.stringify(watchlist));
   }, [watchlist]);
+  async function fetchAuctionPlayers(stage) {
+    const stages = stage === 0 ? [1, 2, 3, 4] : [stage];
+    const responses = await Promise.all(stages.map((item) => supabase.rpc("get_auction_room", { p_stage: item })));
+    return {
+      data: responses.flatMap((response) => response.data || []),
+      error: responses.find((response) => response.error)?.error,
+    };
+  }
   async function refresh(activeSession = session) {
     setLoading(true);
     const { data, error } = await supabase.rpc(
@@ -1606,7 +1615,7 @@ export default function App() {
       if (tableError) setMessage(tableError.message);
       setLeagueTable(tableData || null);
       setLeagueLoading(false);
-      const { data: items, error: auctionError } = await supabase.rpc("get_auction_room", { p_stage: auctionStage });
+      const { data: items, error: auctionError } = await fetchAuctionPlayers(auctionStage);
       if (auctionError) setMessage(auctionError.message);
       setAuctions(items || []);
     }
@@ -1630,7 +1639,7 @@ export default function App() {
     setAuctionLoading(true);
     setSelected(null);
     setHistory([]);
-    const { data, error } = await supabase.rpc("get_auction_room", { p_stage: stage });
+    const { data, error } = await fetchAuctionPlayers(stage);
     if (error) setMessage(error.message);
     setAuctions(data || []);
     setAuctionLoading(false);
@@ -1817,7 +1826,7 @@ export default function App() {
                       ? "Match schedule and results"
                       : view === "table"
                         ? "League position and season record"
-                    : `Auction Day ${auctionStage} · prices update live`}
+                    : auctionStage === 0 ? "All player auctions · prices update live" : `Auction Day ${auctionStage} · prices update live`}
             </p>
           </div>
           <button className="ghost-btn" onClick={() => supabase.auth.signOut()}>
@@ -1926,6 +1935,9 @@ export default function App() {
                 <p>New groups of unique player-season cards open each day.</p>
               </div>
               <div className="auction-stage-tabs">
+                <button className={auctionStage === 0 ? "active all-players" : "all-players"} onClick={() => changeAuctionStage(0)}>
+                  <span>Full market</span><strong>All players</strong><small>537 cards</small>
+                </button>
                 {[1, 2, 3, 4].map((stage) => {
                   const stageState = auctionStageState(season, stage);
                   const start = auctionStageStart(season, stage);
@@ -1936,19 +1948,21 @@ export default function App() {
                   </button>;
                 })}
               </div>
-              <div className={`active-stage-status ${auctionStageState(season, auctionStage)}`}>
-                <b>{auctionStageState(season, auctionStage) === "live" ? "● Live" : auctionStageState(season, auctionStage) === "complete" ? "✓ Complete" : "◷ Upcoming"}</b>
-                <span>{auctionStageState(season, auctionStage) === "live" ? `${left(auctionStage === 4 ? season?.fixed_price_start : auctionStageStart(season, auctionStage + 1))} remaining` : auctionStageState(season, auctionStage) === "upcoming" ? `Opens in ${left(auctionStageStart(season, auctionStage)).replace("Starts after first bid", "TBA")}` : "Winning bids have been settled into squads"}</span>
+              <div className={`active-stage-status ${auctionStage === 0 ? "all" : auctionStageState(season, auctionStage)}`}>
+                {auctionStage === 0 ? <><b>537 player cards</b><span>Use the position filters below or choose an auction day</span></> : <><b>{auctionStageState(season, auctionStage) === "live" ? "● Live" : auctionStageState(season, auctionStage) === "complete" ? "✓ Complete" : "◷ Upcoming"}</b><span>{auctionStageState(season, auctionStage) === "live" ? `${left(auctionStage === 4 ? season?.fixed_price_start : auctionStageStart(season, auctionStage + 1))} remaining` : auctionStageState(season, auctionStage) === "upcoming" ? `Opens in ${left(auctionStageStart(season, auctionStage)).replace("Starts after first bid", "TBA")}` : "Winning bids have been settled into squads"}</span></>}
               </div>
             </div>
             <div className="section-head">
               <div>
                 <span className="eyebrow">Player market</span>
-                <h2>Day {auctionStage} player cards</h2>
+                <h2>{auctionStage === 0 ? "All player cards" : `Day ${auctionStage} player cards`}</h2>
               </div>
               <span className="results-count">
                 {visible.length} player{visible.length === 1 ? "" : "s"}
               </span>
+            </div>
+            <div className="position-filter-bar" aria-label="Filter players by position">
+              {[['ALL','All players'],['GK','Goalkeepers'],['CD','Defenders'],['MD','Midfielders'],['ATT','Forwards']].map(([value,label]) => <button key={value} className={positionFilter === value ? "active" : ""} onClick={() => setPositionFilter(value)}>{label}<span>{value === 'ALL' ? auctions.length : auctions.filter((a) => position(a) === value).length}</span></button>)}
             </div>
             <div className="auction-toolbar">
               <input
@@ -2055,8 +2069,8 @@ export default function App() {
                   const leading = a.current_winner_club_id === club.id;
                   return <article className={`auction-list-item${isExpanded ? " expanded" : ""}`} key={a.id}>
                     <button className="auction-list-row" onClick={() => setExpandedAuction(isExpanded ? null : a.id)} aria-expanded={isExpanded}>
-                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)}</strong><small>{a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
-                      <b>{position(a)}</b>
+                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)}</strong><small>{positionLabel(a)} · {a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
+                      <b>{positionLabel(a)}</b>
                       <strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong>
                       <span className={leading ? "list-winning" : `list-${a.status}`}>{leading ? "Winning" : a.status}</span>
                       <span className="timer">{left(a.ends_at)}</span>
