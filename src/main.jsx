@@ -17,6 +17,7 @@ import './tactics.css'
 import './player-profile.css'
 import './squad-owned.css'
 import './auction-stages.css'
+import './auction-list.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

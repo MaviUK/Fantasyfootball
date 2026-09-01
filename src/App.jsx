@@ -1558,6 +1558,8 @@ export default function App() {
     [positionFilter, setPositionFilter] = useState("ALL"),
     [show, setShow] = useState("all"),
     [sort, setSort] = useState("ending"),
+    [marketView, setMarketView] = useState("list"),
+    [expandedAuction, setExpandedAuction] = useState(null),
     [auctionStage, setAuctionStage] = useState(1),
     [auctionLoading, setAuctionLoading] = useState(false),
     [view, setView] = useState("home"),
@@ -1763,6 +1765,8 @@ export default function App() {
               Number(a.player_seasons?.overall_rating || 0)
             );
           if (sort === "name") return name(a).localeCompare(name(b));
+          if (sort === "position")
+            return position(a).localeCompare(position(b)) || name(a).localeCompare(name(b));
           return (
             new Date(a.ends_at || "9999-12-31") -
             new Date(b.ends_at || "9999-12-31")
@@ -1980,7 +1984,12 @@ export default function App() {
                 <option value="price-high">Price: high to low</option>
                 <option value="rating">Highest rating</option>
                 <option value="name">Player name</option>
+                <option value="position">Position</option>
               </select>
+              <div className="market-view-toggle" aria-label="Market view">
+                <button className={marketView === "list" ? "active" : ""} onClick={() => setMarketView("list")}>☰ List</button>
+                <button className={marketView === "cards" ? "active" : ""} onClick={() => setMarketView("cards")}>▦ Cards</button>
+              </div>
               <div className="segmented">
                 <button
                   className={show === "all" ? "active" : ""}
@@ -2010,7 +2019,7 @@ export default function App() {
             </div>
             {loading || auctionLoading ? (
               <div className="empty-state">Refreshing auctions…</div>
-            ) : visible.length ? (
+            ) : visible.length && marketView === "cards" ? (
               <div className="auction-grid">
                 {visible.map((a) => (
                   <AuctionCard
@@ -2032,6 +2041,30 @@ export default function App() {
                     onProfile={openPlayerProfile}
                   />
                 ))}
+              </div>
+            ) : visible.length ? (
+              <div className="auction-list-view">
+                <div className="auction-list-head">
+                  <button onClick={() => setSort("name")}>Player {sort === "name" ? "↑" : ""}</button>
+                  <button onClick={() => setSort("position")}>Position {sort === "position" ? "↑" : ""}</button>
+                  <button onClick={() => setSort(sort === "price-low" ? "price-high" : "price-low")}>Price {sort === "price-low" ? "↑" : sort === "price-high" ? "↓" : ""}</button>
+                  <span>Status</span><span>Ends</span><span />
+                </div>
+                {visible.map((a) => {
+                  const isExpanded = expandedAuction === a.id;
+                  const leading = a.current_winner_club_id === club.id;
+                  return <article className={`auction-list-item${isExpanded ? " expanded" : ""}`} key={a.id}>
+                    <button className="auction-list-row" onClick={() => setExpandedAuction(isExpanded ? null : a.id)} aria-expanded={isExpanded}>
+                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)}</strong><small>{a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
+                      <b>{position(a)}</b>
+                      <strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong>
+                      <span className={leading ? "list-winning" : `list-${a.status}`}>{leading ? "Winning" : a.status}</span>
+                      <span className="timer">{left(a.ends_at)}</span>
+                      <i>{isExpanded ? "−" : "+"}</i>
+                    </button>
+                    {isExpanded && <div className="auction-list-detail"><AuctionCard auction={a} clubId={club.id} value={bid[a.id] ?? ""} setValue={(value) => setBid((current) => ({ ...current, [a.id]: value }))} placeBid={() => placeBid(a)} busy={bidding === a.id} open={selected === a.id} history={history} toggleHistory={() => loadHistory(a.id)} watched={watchlist.includes(a.id)} toggleWatch={() => toggleWatch(a.id)} availablePence={available} onProfile={openPlayerProfile} /></div>}
+                  </article>;
+                })}
               </div>
             ) : (
               <div className="empty-state">
