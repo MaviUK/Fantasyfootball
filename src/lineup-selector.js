@@ -10,12 +10,21 @@ function enhanceLineup(){
  const rows=()=>[...sheet.querySelectorAll('.available-lineup-list .lineup-player')];
  const filter=(pos)=>{rows().forEach(row=>{const p=row.querySelector('.avatar')?.textContent?.trim();row.style.display=pos&&p!==pos?'none':''})};
  const normalise=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+ const rowName=row=>normalise(row?.querySelector('strong')?.textContent);
  const findStarterRow=(pos,playerName)=>{
    const wanted=normalise(playerName);
    return [...(xiCol?.querySelectorAll('.lineup-player')||[])].find(row=>{
      const rowPos=row.querySelector('.avatar')?.textContent?.trim();
-     const rowName=normalise(row.querySelector('strong')?.textContent);
-     return rowPos===pos&&(rowName===wanted||rowName.endsWith(wanted)||wanted.endsWith(rowName));
+     const current=rowName(row);
+     return rowPos===pos&&(current===wanted||current.endsWith(wanted)||wanted.endsWith(current));
+   });
+ };
+ const findAvailableRow=(pos,playerName)=>{
+   const wanted=normalise(playerName);
+   return rows().find(row=>{
+     const rowPos=row.querySelector('.avatar')?.textContent?.trim();
+     const current=rowName(row);
+     return rowPos===pos&&(current===wanted||current.endsWith(wanted)||wanted.endsWith(current));
    });
  };
  const open=(pos='',playerName='')=>{sheet.dataset.position=pos;sheet.dataset.playerName=playerName;filter(pos);sheet.querySelector('header b').textContent=pos?`Replace ${pos} player`:'Select player';sheet.querySelector('header small').textContent=pos?`Only ${pos} players are eligible`:'Choose Start or Bench';sheet.classList.add('open');document.body.classList.add('picker-open')};
@@ -26,13 +35,22 @@ function enhanceLineup(){
    const start=e.target.closest('.lineup-actions button:first-child');
    if(!start)return;
    if(sheet.dataset.swapBypass==='1'){sheet.dataset.swapBypass='';setTimeout(close,80);return}
-   const pos=sheet.dataset.position||'',playerName=sheet.dataset.playerName||'';
-   if(!pos||!playerName){setTimeout(close,80);return}
-   const outgoing=findStarterRow(pos,playerName),removeButton=outgoing?.querySelector('.lineup-remove');
-   if(!removeButton){setTimeout(close,80);return}
+   const pos=sheet.dataset.position||'',outgoingName=sheet.dataset.playerName||'';
+   if(!pos||!outgoingName){setTimeout(close,80);return}
+   const chosenRow=start.closest('.lineup-player'),chosenName=chosenRow?.querySelector('strong')?.textContent?.trim()||'';
+   const outgoing=findStarterRow(pos,outgoingName),removeButton=outgoing?.querySelector('.lineup-remove');
+   if(!removeButton||!chosenName){return}
    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
    removeButton.click();
-   setTimeout(()=>{sheet.dataset.swapBypass='1';start.click()},60);
+   let tries=0;
+   const completeSwap=()=>{
+     tries++;
+     const freshRow=findAvailableRow(pos,chosenName);
+     const freshStart=freshRow?.querySelector('.lineup-actions button:first-child');
+     if(freshStart){sheet.dataset.swapBypass='1';freshStart.click();return}
+     if(tries<12)setTimeout(completeSwap,50);else sheet.dataset.swapBypass='';
+   };
+   setTimeout(completeSwap,40);
  },true);
  const benchCol=columns.querySelectorAll('.lineup-column')[1]; if(benchCol){benchCol.classList.add('bench-strip');const head=benchCol.querySelector('.lineup-column-head');if(head){const b=document.createElement('button');b.type='button';b.className='bench-add';b.textContent='+ Add substitute';b.onclick=()=>open();head.appendChild(b)}}
  const obs=new MutationObserver(()=>{if(!document.body.contains(page)){sheet.remove();obs.disconnect();return} if(sheet.classList.contains('open'))filter(sheet.dataset.position||'')});obs.observe(page,{childList:true,subtree:true});
