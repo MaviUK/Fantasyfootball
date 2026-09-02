@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase.js";
 
+const DEFAULT_SQUAD_LIMIT = 22;
+const MIN_GOALKEEPERS = 2;
+const MATCHDAY_SQUAD_SIZE = 17;
 const money = (p) => `£${(Number(p || 0) / 100000000).toFixed(1)}m`;
 const name = (a) => a.player_seasons?.players?.full_name || "Player";
 const compactName = (a) => {
@@ -375,6 +378,7 @@ function PlayerProfile({ data, loading, error, onClose }) {
 }
 
 function ClubHome({ season, club, auctions, onOpenAuctions }) {
+  const squadLimit = Number(club.squad_limit || DEFAULT_SQUAD_LIMIT);
   const winning = auctions.filter((a) => a.current_winner_club_id === club.id);
   const positions = ["GK", "CD", "MD", "ATT"].map((label) => ({
     label,
@@ -395,7 +399,7 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
           <span className="eyebrow">Club headquarters</span>
           <h2>Your season starts here</h2>
           <p>
-            Build a balanced 17-player squad before the first match deadline.
+            Build a balanced {squadLimit}-player squad before the first match deadline.
             Each player-season card is unique, so once another club owns it, it
             is gone.
           </p>
@@ -491,17 +495,33 @@ function ClubHome({ season, club, auctions, onOpenAuctions }) {
   );
 }
 
-function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
+function ProvisionalSquad({ players, squadLimit, onOpenAuctions, onProfile }) {
   const goalkeepers = players.filter((a) => position(a) === "GK");
   const outfield = players.filter((a) => position(a) !== "GK");
+  const outfieldTarget = Math.max(0, squadLimit - MIN_GOALKEEPERS);
+  const remainingSlots = Math.max(0, squadLimit - players.length);
+  const emptyGoalkeeperSlots = Math.min(
+    remainingSlots,
+    Math.max(0, MIN_GOALKEEPERS - goalkeepers.length),
+  );
   const totalCost = players.reduce(
     (sum, a) =>
       sum + Number(a.current_price_pence || a.reserve_price_pence || 0),
     0,
   );
   const slots = [
-    { label: "Goalkeepers", players: goalkeepers, required: 2 },
-    { label: "Outfield players", players: outfield, required: 15 },
+    {
+      label: "Goalkeepers",
+      players: goalkeepers,
+      target: MIN_GOALKEEPERS,
+      emptySlots: emptyGoalkeeperSlots,
+    },
+    {
+      label: "Outfield players",
+      players: outfield,
+      target: outfieldTarget,
+      emptySlots: remainingSlots - emptyGoalkeeperSlots,
+    },
   ];
 
   return (
@@ -524,12 +544,12 @@ function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
           <span>Total players</span>
           <strong>
             {players.length}
-            <small>/17</small>
+            <small>/{squadLimit}</small>
           </strong>
           <div className="squad-track">
             <i
               style={{
-                width: `${Math.min(100, (players.length / 17) * 100)}%`,
+                width: `${Math.min(100, (players.length / squadLimit) * 100)}%`,
               }}
             />
           </div>
@@ -538,12 +558,12 @@ function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
           <span>Goalkeepers</span>
           <strong>
             {goalkeepers.length}
-            <small>/2</small>
+            <small>/{MIN_GOALKEEPERS} min</small>
           </strong>
           <div className="squad-track">
             <i
               style={{
-                width: `${Math.min(100, (goalkeepers.length / 2) * 100)}%`,
+                width: `${Math.min(100, (goalkeepers.length / MIN_GOALKEEPERS) * 100)}%`,
               }}
             />
           </div>
@@ -552,12 +572,12 @@ function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
           <span>Outfield</span>
           <strong>
             {outfield.length}
-            <small>/15</small>
+            <small>/{outfieldTarget} target</small>
           </strong>
           <div className="squad-track">
             <i
               style={{
-                width: `${Math.min(100, (outfield.length / 15) * 100)}%`,
+                width: `${Math.min(100, (outfield.length / outfieldTarget) * 100)}%`,
               }}
             />
           </div>
@@ -573,7 +593,7 @@ function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
           <div className="section-head">
             <div>
               <span className="eyebrow">
-                {group.players.length} of {group.required}
+                {group.players.length} of {group.target}
               </span>
               <h3>{group.label}</h3>
             </div>
@@ -603,7 +623,7 @@ function ProvisionalSquad({ players, onOpenAuctions, onProfile }) {
               </article>
             ))}
             {Array.from(
-              { length: Math.max(0, group.required - group.players.length) },
+              { length: group.emptySlots },
               (_, index) => (
                 <button
                   className="empty-squad-slot"
@@ -1072,7 +1092,7 @@ function LineupPlanner({ season, players, onOpenAuctions }) {
             <span>
               {lineupComplete
                 ? "✓ Lineup ready"
-                : `${startingPlayers.length + benchPlayers.length}/17 selected`}
+                : `${startingPlayers.length + benchPlayers.length}/${MATCHDAY_SQUAD_SIZE} selected`}
             </span>
             <small>
               {season?.first_match_at
@@ -1115,7 +1135,7 @@ function LineupPlanner({ season, players, onOpenAuctions }) {
           {lineupMessage}
         </div>
       )}
-      {players.length < 17 && (
+      {players.length < MATCHDAY_SQUAD_SIZE && (
         <div className="lineup-notice">
           <div>
             <strong>Your provisional squad is not complete.</strong>
@@ -1866,6 +1886,7 @@ export default function App() {
     return <div className="loading-screen">Loading your club…</div>;
   if (!state?.club) return <ClubSetup onCreated={() => refresh(true)} />;
   const { season, club } = state;
+  const squadLimit = Number(club.squad_limit || DEFAULT_SQUAD_LIMIT);
   const available =
     Number(club.budget_pence || 0) - Number(club.reserved_pence || 0);
   const winning = auctions.filter(
@@ -1884,7 +1905,7 @@ export default function App() {
               {view === "home"
                 ? "Club headquarters"
                 : view === "squad"
-                  ? "Provisional 17-player squad"
+                  ? `Provisional ${squadLimit}-player squad`
                   : view === "lineup"
                     ? "Starting XI and substitutes"
                     : view === "tactics"
@@ -1917,7 +1938,7 @@ export default function App() {
             className={view === "squad" ? "active" : ""}
             onClick={() => setView("squad")}
           >
-            My Squad <span>{squad.length}/17</span>
+            My Squad <span>{squad.length}/{squadLimit}</span>
           </button>
           <button
             className={view === "lineup" ? "active" : ""}
@@ -1978,6 +1999,7 @@ export default function App() {
         ) : view === "squad" ? (
           <ProvisionalSquad
             players={squad}
+            squadLimit={squadLimit}
             onOpenAuctions={() => setView("auctions")}
             onProfile={openPlayerProfile}
           />
