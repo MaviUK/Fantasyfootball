@@ -162,7 +162,9 @@ function AuctionCard({
   value,
   setValue,
   placeBid,
+  removeBid,
   busy,
+  removing,
   open,
   history,
   toggleHistory,
@@ -297,6 +299,16 @@ function AuctionCard({
           {open ? "Hide history" : "Bid history"}
         </button>
       </div>
+      {leading && !ended && a.status === "live" && (
+        <button
+          type="button"
+          className="remove-bid-btn"
+          disabled={removing || busy}
+          onClick={removeBid}
+        >
+          {removing ? "Removing bid…" : "Remove my bid"}
+        </button>
+      )}
       <button className="profile-link" onClick={() => onProfile(p.id)}>View full player profile →</button>
       {open && (
         <div className="bid-history">
@@ -1558,6 +1570,7 @@ export default function App() {
     [message, setMessage] = useState(""),
     [bid, setBid] = useState({}),
     [bidding, setBidding] = useState(null),
+    [withdrawing, setWithdrawing] = useState(null),
     [tick, setTick] = useState(0),
     [selected, setSelected] = useState(null),
     [history, setHistory] = useState([]),
@@ -1741,6 +1754,27 @@ export default function App() {
       if (selected === a.id) await loadHistory(a.id, true);
     }
     setBidding(null);
+  }
+  async function removeBid(a) {
+    if (!window.confirm(`Remove your bid on ${name(a)}? Your reserved budget will be released immediately.`)) return;
+    setWithdrawing(a.id);
+    setMessage("");
+    const { data, error } = await supabase.rpc("withdraw_my_auction_bid", {
+      p_auction_id: a.id,
+    });
+    if (error) {
+      setMessage(error.message);
+    } else {
+      setBid((current) => ({ ...current, [a.id]: "" }));
+      setMessage(
+        data?.current_winner_club_id
+          ? "Your bid was removed. The next eligible bidder is now leading."
+          : "Your bid was removed and your reserved budget has been released.",
+      );
+      await refresh(true);
+      if (selected === a.id) await loadHistory(a.id, true);
+    }
+    setWithdrawing(null);
   }
   function toggleWatch(id) {
     setWatchlist((current) =>
@@ -2102,6 +2136,8 @@ export default function App() {
                       setBid((current) => ({ ...current, [a.id]: value }))
                     }
                     placeBid={() => placeBid(a)}
+                    removeBid={() => removeBid(a)}
+                    removing={withdrawing === a.id}
                     busy={bidding === a.id}
                     open={selected === a.id}
                     history={history}
@@ -2145,7 +2181,9 @@ export default function App() {
                       <span className="timer">{left(a.ends_at)}</span>
                       <i>{isExpanded ? "−" : "+"}</i>
                     </button>
-                    {isExpanded && <div className="auction-list-detail"><AuctionCard auction={a} clubId={club.id} value={bid[a.id] ?? ""} setValue={(value) => setBid((current) => ({ ...current, [a.id]: value }))} placeBid={() => placeBid(a)} busy={bidding === a.id} open={selected === a.id} history={history} toggleHistory={() => loadHistory(a.id)} watched={watchlist.includes(a.id)} toggleWatch={() => toggleWatch(a.id)} availablePence={available} onProfile={openPlayerProfile} /></div>}
+                    {isExpanded && <div className="auction-list-detail"><AuctionCard auction={a} clubId={club.id} value={bid[a.id] ?? ""} setValue={(value) => setBid((current) => ({ ...current, [a.id]: value }))} placeBid={() => placeBid(a)}
+                    removeBid={() => removeBid(a)}
+                    removing={withdrawing === a.id} busy={bidding === a.id} open={selected === a.id} history={history} toggleHistory={() => loadHistory(a.id)} watched={watchlist.includes(a.id)} toggleWatch={() => toggleWatch(a.id)} availablePence={available} onProfile={openPlayerProfile} /></div>}
                   </article>;
                 })}
               </div>
