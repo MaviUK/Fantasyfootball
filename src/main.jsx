@@ -5,6 +5,7 @@ import { supabase } from './lib/supabase.js'
 import './live-match.js'
 import './league-matches.js'
 import './season-home.js'
+import './lineup-selector.js'
 import './styles.css'
 import './auction-room.css'
 import './dashboard.css'
@@ -27,6 +28,7 @@ import './sky-theme.css'
 import './club-badge.css'
 import './season-home.css'
 import './league-matches.css'
+import './lineup-selector.css'
 
 globalThis.auctions = globalThis.auctions || []
 const formationLimits={'4-4-2':{CD:4,MD:4,ATT:2},'4-3-3':{CD:4,MD:3,ATT:3},'3-5-2':{CD:3,MD:5,ATT:2},'4-2-3-1':{CD:4,MD:5,ATT:1},'5-3-2':{CD:5,MD:3,ATT:2}}
