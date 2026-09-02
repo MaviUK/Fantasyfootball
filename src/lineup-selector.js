@@ -6,15 +6,35 @@ function enhanceLineup(){
  pitch.parentElement.insertBefore(toolbar,pitch);
  const sheet=document.createElement('div'); sheet.className='squad-picker-sheet'; sheet.innerHTML='<button type="button" class="sheet-backdrop" aria-label="Close squad"></button><section><header><div><b>Select player</b><small>Choose Start or Bench</small></div><button type="button" class="sheet-close">×</button></header><div class="sheet-content"></div></section>';
  document.body.appendChild(sheet); sheet.querySelector('.sheet-content').appendChild(available);
+ const xiCol=columns.querySelectorAll('.lineup-column')[0]; if(xiCol)xiCol.classList.add('xi-management');
  const rows=()=>[...sheet.querySelectorAll('.available-lineup-list .lineup-player')];
  const filter=(pos)=>{rows().forEach(row=>{const p=row.querySelector('.avatar')?.textContent?.trim();row.style.display=pos&&p!==pos?'none':''})};
- const open=(pos='')=>{sheet.dataset.position=pos;filter(pos);sheet.querySelector('header b').textContent=pos?`Replace ${pos} player`:'Select player';sheet.querySelector('header small').textContent=pos?`Only ${pos} players are eligible`:'Choose Start or Bench';sheet.classList.add('open');document.body.classList.add('picker-open')};
- const close=()=>{sheet.classList.remove('open');document.body.classList.remove('picker-open');sheet.dataset.position='';filter('')};
+ const normalise=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+ const findStarterRow=(pos,playerName)=>{
+   const wanted=normalise(playerName);
+   return [...(xiCol?.querySelectorAll('.lineup-player')||[])].find(row=>{
+     const rowPos=row.querySelector('.avatar')?.textContent?.trim();
+     const rowName=normalise(row.querySelector('strong')?.textContent);
+     return rowPos===pos&&(rowName===wanted||rowName.endsWith(wanted)||wanted.endsWith(rowName));
+   });
+ };
+ const open=(pos='',playerName='')=>{sheet.dataset.position=pos;sheet.dataset.playerName=playerName;filter(pos);sheet.querySelector('header b').textContent=pos?`Replace ${pos} player`:'Select player';sheet.querySelector('header small').textContent=pos?`Only ${pos} players are eligible`:'Choose Start or Bench';sheet.classList.add('open');document.body.classList.add('picker-open')};
+ const close=()=>{sheet.classList.remove('open');document.body.classList.remove('picker-open');sheet.dataset.position='';sheet.dataset.playerName='';filter('')};
  toolbar.querySelector('.open-squad').onclick=()=>open(); sheet.querySelector('.sheet-close').onclick=close; sheet.querySelector('.sheet-backdrop').onclick=close;
- pitch.addEventListener('click',e=>{const card=e.target.closest('.pitch-player.filled');if(!card)return;const pos=card.querySelector('span')?.textContent?.trim();open(pos)});
- sheet.addEventListener('click',e=>{const start=e.target.closest('.lineup-actions button:first-child');if(start)setTimeout(close,80)});
+ pitch.addEventListener('click',e=>{const card=e.target.closest('.pitch-player.filled');if(!card)return;const pos=card.querySelector('span')?.textContent?.trim();const playerName=card.querySelector('strong')?.textContent?.trim()||'';open(pos,playerName)});
+ sheet.addEventListener('click',e=>{
+   const start=e.target.closest('.lineup-actions button:first-child');
+   if(!start)return;
+   if(sheet.dataset.swapBypass==='1'){sheet.dataset.swapBypass='';setTimeout(close,80);return}
+   const pos=sheet.dataset.position||'',playerName=sheet.dataset.playerName||'';
+   if(!pos||!playerName){setTimeout(close,80);return}
+   const outgoing=findStarterRow(pos,playerName),removeButton=outgoing?.querySelector('.lineup-remove');
+   if(!removeButton){setTimeout(close,80);return}
+   e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+   removeButton.click();
+   setTimeout(()=>{sheet.dataset.swapBypass='1';start.click()},60);
+ },true);
  const benchCol=columns.querySelectorAll('.lineup-column')[1]; if(benchCol){benchCol.classList.add('bench-strip');const head=benchCol.querySelector('.lineup-column-head');if(head){const b=document.createElement('button');b.type='button';b.className='bench-add';b.textContent='+ Add substitute';b.onclick=()=>open();head.appendChild(b)}}
- const xiCol=columns.querySelectorAll('.lineup-column')[0]; if(xiCol)xiCol.classList.add('xi-management');
  const obs=new MutationObserver(()=>{if(!document.body.contains(page)){sheet.remove();obs.disconnect();return} if(sheet.classList.contains('open'))filter(sheet.dataset.position||'')});obs.observe(page,{childList:true,subtree:true});
 }
 new MutationObserver(enhanceLineup).observe(document.documentElement,{childList:true,subtree:true});
