@@ -1564,6 +1564,7 @@ export default function App() {
     [query, setQuery] = useState(""),
     [positionFilter, setPositionFilter] = useState("ALL"),
     [seasonFilter, setSeasonFilter] = useState("ALL"),
+    [clubFilter, setClubFilter] = useState("ALL"),
     [show, setShow] = useState("all"),
     [sort, setSort] = useState("ending"),
     [marketView, setMarketView] = useState("list"),
@@ -1762,6 +1763,7 @@ export default function App() {
               (a.player_seasons?.season_label || "").toLowerCase().includes(q)) &&
             (positionFilter === "ALL" || position(a) === positionFilter) &&
             (seasonFilter === "ALL" || a.player_seasons?.season_label === seasonFilter) &&
+            (clubFilter === "ALL" || a.player_seasons?.clubs?.name === clubFilter) &&
             (show === "all" ||
               (show === "winning" &&
                 a.current_winner_club_id === state?.club?.id) ||
@@ -1798,6 +1800,7 @@ export default function App() {
       query,
       positionFilter,
       seasonFilter,
+      clubFilter,
       show,
       sort,
       state?.club?.id,
@@ -1806,6 +1809,22 @@ export default function App() {
     ],
   );
   const availableSeasons = [...new Set(auctions.map((a) => a.player_seasons?.season_label).filter(Boolean))].sort().reverse();
+  const availableHistoricalClubs = useMemo(() => [...new Set(
+    auctions
+      .filter((a) => seasonFilter === "ALL" || a.player_seasons?.season_label === seasonFilter)
+      .map((a) => a.player_seasons?.clubs?.name)
+      .filter(Boolean),
+  )].sort((a, b) => a.localeCompare(b)), [auctions, seasonFilter]);
+  const selectedSquadTotal = clubFilter === "ALL" ? 0 : auctions.filter(
+    (a) =>
+      a.player_seasons?.clubs?.name === clubFilter &&
+      (seasonFilter === "ALL" || a.player_seasons?.season_label === seasonFilter),
+  ).length;
+  useEffect(() => {
+    if (clubFilter !== "ALL" && !availableHistoricalClubs.includes(clubFilter)) {
+      setClubFilter("ALL");
+    }
+  }, [availableHistoricalClubs, clubFilter]);
   if (!authReady)
     return <div className="loading-screen">Loading Fantasy Football…</div>;
   if (!session) return <AuthScreen />;
@@ -1969,7 +1988,13 @@ export default function App() {
             <div className="section-head">
               <div>
                 <span className="eyebrow">Player market</span>
-                <h2>{auctionStage === 0 ? "All player cards" : `Day ${auctionStage} player cards`}</h2>
+                <h2>
+                  {clubFilter !== "ALL"
+                    ? `${clubFilter}${seasonFilter !== "ALL" ? ` ${seasonFilter}` : ""} squad`
+                    : auctionStage === 0
+                      ? "All player cards"
+                      : `Day ${auctionStage} player cards`}
+                </h2>
               </div>
               <span className="results-count">
                 {visible.length} player{visible.length === 1 ? "" : "s"}
@@ -2005,6 +2030,10 @@ export default function App() {
               <select aria-label="Filter by historical season" value={seasonFilter} onChange={(e) => setSeasonFilter(e.target.value)}>
                 <option value="ALL">All seasons</option>
                 {availableSeasons.map((seasonLabel) => <option key={seasonLabel} value={seasonLabel}>{seasonLabel}</option>)}
+              </select>
+              <select aria-label="Filter by historical club" value={clubFilter} onChange={(e) => setClubFilter(e.target.value)}>
+                <option value="ALL">All historical clubs</option>
+                {availableHistoricalClubs.map((clubName) => <option key={clubName} value={clubName}>{clubName}</option>)}
               </select>
               <select
                 aria-label="Sort auctions"
@@ -2049,6 +2078,16 @@ export default function App() {
                 </button>
               </div>
             </div>
+            {clubFilter !== "ALL" && (
+              <div className="historical-squad-summary">
+                <div>
+                  <span className="eyebrow">Historical squad</span>
+                  <strong>{clubFilter} · {seasonFilter === "ALL" ? "All available seasons" : seasonFilter}</strong>
+                  <small>{selectedSquadTotal} player-season card{selectedSquadTotal === 1 ? "" : "s"} in this squad</small>
+                </div>
+                <button className="secondary-btn" onClick={() => setClubFilter("ALL")}>Clear team</button>
+              </div>
+            )}
             {loading || auctionLoading ? (
               <div className="empty-state">Refreshing auctions…</div>
             ) : visible.length && marketView === "cards" ? (
