@@ -32,7 +32,6 @@ function renderDashboard(data){
   const season=data.state?.season
   if(!season || season.status!=='active') return
 
-  const club=data.state?.club
   const fixtures=[...(data.fixtures||[])].sort((a,b)=>new Date(a.scheduled_at)-new Date(b.scheduled_at))
   const now=Date.now()
   const next=fixtures.find(f=>f.status!=='completed' && f.status!=='simulated' && new Date(f.scheduled_at).getTime()>=now) || fixtures.find(f=>f.home_goals==null)
@@ -41,6 +40,14 @@ function renderDashboard(data){
   const upcoming=fixtures.filter(f=>f.home_goals==null && (!next || f.id!==next.id)).slice(0,4)
   const standings=data.table?.standings||[]
   const me=standings.find(r=>r.is_my_club)
+
+  document.body.classList.add('season-active-home')
+  const stats=document.querySelector('.stats-grid')
+  if(stats){
+    const cards=[...stats.children]
+    cards.forEach((card,index)=>{if(index>=2)card.remove()})
+    stats.classList.add('season-finance-stats')
+  }
 
   host.dataset.seasonDashboard='1'
   host.classList.add('season-dashboard-hero')
