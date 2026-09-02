@@ -1977,7 +1977,7 @@ export default function App() {
                   return <button key={stage} className={`${auctionStage === stage ? "active" : ""} ${stageState}`} onClick={() => changeAuctionStage(stage)}>
                     <span>Day {stage}</span>
                     <strong>{stageState === "live" ? "Live now" : stageState === "complete" ? "Complete" : start ? new Date(start).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "TBA"}</strong>
-                    <small>{stageState === "upcoming" && start ? `Opens ${new Date(start).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : stageState === "live" ? "Bidding open" : "Bidding closed"}</small>
+                    <small>{stageState === "upcoming" ? (start ? `Opens ${new Date(start).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : "Schedule pending") : stageState === "live" ? "Bidding open" : "Bidding closed"}</small>
                   </button>;
                 })}
               </div>
