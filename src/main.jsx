@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
+import { supabase } from './lib/supabase.js'
 import './styles.css'
 import './auction-room.css'
 import './dashboard.css'
@@ -20,8 +21,8 @@ import './auction-stages.css'
 import './auction-list.css'
 import './fm-theme.css'
 import './sky-theme.css'
+import './club-badge.css'
 
-// Compatibility guard for the lineup planner's legacy dependency reference.
 globalThis.auctions = globalThis.auctions || []
 
 const formationLimits = {
@@ -61,6 +62,60 @@ document.addEventListener('click', (event) => {
   removeButton.click()
   setTimeout(() => button.click(), 0)
 }, true)
+
+async function installClubBadgeControl() {
+  const topbar = document.querySelector('.topbar')
+  if (!topbar || topbar.querySelector('.club-badge-control')) return
+  const { data: sessionData } = await supabase.auth.getSession()
+  const user = sessionData?.session?.user
+  if (!user) return
+  const { data: state } = await supabase.rpc('get_my_game_state')
+  if (!state?.club) return
+
+  const identity = topbar.firstElementChild
+  if (!identity) return
+  identity.classList.add('club-identity')
+  const badge = document.createElement('div')
+  badge.className = 'club-badge-control'
+  badge.innerHTML = '<button type="button" class="club-badge-button" aria-label="Upload club badge" title="Upload club badge"><span class="club-badge-placeholder">+</span><img alt="Club badge" hidden></button><input type="file" accept="image/png,image/jpeg,image/webp" hidden><small>Club badge</small>'
+  identity.prepend(badge)
+  const img = badge.querySelector('img')
+  const placeholder = badge.querySelector('.club-badge-placeholder')
+  const input = badge.querySelector('input')
+  const button = badge.querySelector('button')
+
+  const showBadge = (path) => {
+    if (!path) return
+    const { data } = supabase.storage.from('club-badges').getPublicUrl(path)
+    if (!data?.publicUrl) return
+    img.src = `${data.publicUrl}?v=${Date.now()}`
+    img.hidden = false
+    placeholder.hidden = true
+  }
+  showBadge(state.club.badge_path)
+  button.addEventListener('click', () => input.click())
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) return window.alert('Club badge must be 2 MB or smaller.')
+    if (!['image/png','image/jpeg','image/webp'].includes(file.type)) return window.alert('Please use a PNG, JPG or WebP image.')
+    button.disabled = true
+    const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'
+    const path = `${user.id}/badge.${ext}`
+    const { error: uploadError } = await supabase.storage.from('club-badges').upload(path, file, { upsert: true, contentType: file.type })
+    if (uploadError) {
+      button.disabled = false
+      return window.alert(uploadError.message)
+    }
+    const { error: saveError } = await supabase.rpc('set_my_club_badge', { p_badge_path: path })
+    button.disabled = false
+    if (saveError) return window.alert(saveError.message)
+    showBadge(path)
+  })
+}
+
+const badgeObserver = new MutationObserver(() => installClubBadgeControl())
+badgeObserver.observe(document.documentElement, { childList: true, subtree: true })
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
