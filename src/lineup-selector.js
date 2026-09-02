@@ -6,9 +6,10 @@ function enhanceLineup(){
  pitch.parentElement.insertBefore(toolbar,pitch);
  const sheet=document.createElement('div'); sheet.className='squad-picker-sheet'; sheet.innerHTML='<button type="button" class="sheet-backdrop" aria-label="Close squad"></button><section><header><div><b>Select player</b><small>Choose Start or Bench</small></div><button type="button" class="sheet-close">×</button></header><div class="sheet-content"></div></section>';
  document.body.appendChild(sheet); sheet.querySelector('.sheet-content').appendChild(available);
- const open=(pos='')=>{sheet.classList.add('open');document.body.classList.add('picker-open');sheet.dataset.position=pos;const title=sheet.querySelector('header b');title.textContent=pos?`Replace ${pos} player`:'Select player'; filter(pos)};
+ const rows=()=>[...sheet.querySelectorAll('.available-lineup-list .lineup-player')];
+ const filter=(pos)=>{rows().forEach(row=>{const p=row.querySelector('.avatar')?.textContent?.trim();row.style.display=pos&&p!==pos?'none':''})};
+ const open=(pos='')=>{sheet.dataset.position=pos;filter(pos);sheet.querySelector('header b').textContent=pos?`Replace ${pos} player`:'Select player';sheet.querySelector('header small').textContent=pos?`Only ${pos} players are eligible`:'Choose Start or Bench';sheet.classList.add('open');document.body.classList.add('picker-open')};
  const close=()=>{sheet.classList.remove('open');document.body.classList.remove('picker-open');sheet.dataset.position='';filter('')};
- const filter=(pos)=>{sheet.querySelectorAll('.available-lineup-list .lineup-player').forEach(row=>{const p=row.querySelector('.avatar')?.textContent?.trim();row.hidden=!!pos&&p!==pos})};
  toolbar.querySelector('.open-squad').onclick=()=>open(); sheet.querySelector('.sheet-close').onclick=close; sheet.querySelector('.sheet-backdrop').onclick=close;
  pitch.addEventListener('click',e=>{const card=e.target.closest('.pitch-player.filled');if(!card)return;const pos=card.querySelector('span')?.textContent?.trim();open(pos)});
  sheet.addEventListener('click',e=>{const start=e.target.closest('.lineup-actions button:first-child');if(start)setTimeout(close,80)});
