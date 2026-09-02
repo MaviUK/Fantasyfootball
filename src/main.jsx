@@ -22,6 +22,8 @@ import './auction-list.css'
 import './fm-theme.css'
 import './sky-theme.css'
 import './club-badge.css'
+import './season-home.css'
+import './season-home.js'
 
 globalThis.auctions = globalThis.auctions || []
 
