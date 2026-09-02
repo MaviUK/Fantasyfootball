@@ -2,6 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
 import { supabase } from './lib/supabase.js'
+import './live-match.js'
 import './styles.css'
 import './auction-room.css'
 import './dashboard.css'
@@ -23,7 +24,6 @@ import './fm-theme.css'
 import './sky-theme.css'
 import './club-badge.css'
 import './season-home.css'
-import './season-home.js'
 
 globalThis.auctions = globalThis.auctions || []
 
