@@ -18,6 +18,7 @@ import './player-profile.css'
 import './squad-owned.css'
 import './auction-stages.css'
 import './auction-list.css'
+import './fm-theme.css'
 
 // Compatibility guard for the lineup planner's legacy dependency reference.
 globalThis.auctions = globalThis.auctions || []
