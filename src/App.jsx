@@ -1940,7 +1940,7 @@ export default function App() {
               <div className="auction-stage-intro">
                 <span className="eyebrow">Four-day player draft</span>
                 <h2>Auction calendar</h2>
-                <p>New groups of unique player-season cards open each day.</p>
+                <p>Every player starts on Day 1. Only unsold cards continue into the later auction days.</p>
               </div>
               <div className="auction-stage-tabs">
                 <button className={auctionStage === 0 ? "active all-players" : "all-players"} onClick={() => changeAuctionStage(0)}>
