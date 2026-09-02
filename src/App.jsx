@@ -3,6 +3,12 @@ import { supabase } from "./lib/supabase.js";
 
 const money = (p) => `£${(Number(p || 0) / 100000000).toFixed(1)}m`;
 const name = (a) => a.player_seasons?.players?.full_name || "Player";
+const compactName = (a) => {
+  const fullName = name(a);
+  if (fullName.length <= 18) return fullName;
+  const parts = fullName.trim().split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(" ") : fullName;
+};
 const position = (a) => a.player_seasons?.game_position || "—";
 const positionLabel = (a) => ({ GK: "Goalkeeper", CD: "Defender", MD: "Midfielder", ATT: "Forward" })[position(a)] || position(a);
 const left = (date) => {
@@ -2081,7 +2087,19 @@ export default function App() {
                   const leading = a.current_winner_club_id === club.id;
                   return <article className={`auction-list-item${isExpanded ? " expanded" : ""}`} key={a.id}>
                     <button className="auction-list-row" onClick={() => setExpandedAuction(isExpanded ? null : a.id)} aria-expanded={isExpanded}>
-                      <div className="list-player"><span className="mini-position">{position(a)}</span><div><strong>{name(a)} <em>{a.player_seasons?.season_label}</em></strong><small>{positionLabel(a)} · {a.player_seasons?.clubs?.name} · Rating {a.player_seasons?.overall_rating || "—"}</small></div></div>
+                      <div className="list-player">
+                        <span className="mini-position">{position(a)}</span>
+                        <div className="list-player-copy">
+                          <strong className="list-player-name" title={name(a)}>
+                            <span>{compactName(a)}</span>
+                            <em>{a.player_seasons?.season_label}</em>
+                          </strong>
+                          <small className="list-player-meta">
+                            <span>{positionLabel(a)} · {a.player_seasons?.clubs?.name}</span>
+                            <b>Rating {a.player_seasons?.overall_rating || "—"}</b>
+                          </small>
+                        </div>
+                      </div>
                       <b>{positionLabel(a)}</b>
                       <strong>{money(a.current_price_pence || a.reserve_price_pence)}</strong>
                       <span className={leading ? "list-winning" : `list-${a.status}`}>{leading ? "Winning" : a.status}</span>
