@@ -26,6 +26,18 @@ function resultScore(f){
   return `${f.home_goals}–${f.away_goals}`
 }
 
+function openFixture(id){
+  if(!id) return
+  window.dispatchEvent(new CustomEvent('fantasy:open-match-centre',{detail:{fixtureId:id}}))
+}
+
+function wireFixtureLinks(host){
+  host?.querySelectorAll('[data-fixture-id]').forEach(row=>{
+    row.addEventListener('click',()=>openFixture(row.dataset.fixtureId))
+    row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openFixture(row.dataset.fixtureId)}})
+  })
+}
+
 function renderDashboard(data){
   const host=document.querySelector('.club-hero')
   if(!host || host.dataset.seasonDashboard==='1') return
@@ -52,7 +64,7 @@ function renderDashboard(data){
   host.dataset.seasonDashboard='1'
   host.classList.add('season-dashboard-hero')
   host.innerHTML=`
-    <div class="season-next-match">
+    <div class="season-next-match${next?.id?' season-clickable':''}" ${next?.id?`data-fixture-id="${esc(next.id)}" role="button" tabindex="0"`:''}>
       <span class="eyebrow">Next fixture</span>
       <div class="season-fixture-line">
         <div><small>${esc(next?.venue==='home'?'HOME':'AWAY')}</small><strong>${esc(next?.opponent_name||'Fixture pending')}</strong></div>
@@ -79,10 +91,12 @@ function renderDashboard(data){
     oldSection.classList.add('season-overview-section')
     oldSection.innerHTML=`
       <div class="season-overview-columns">
-        <section class="season-panel"><div class="season-panel-head"><span class="eyebrow">Recent form</span><h2>Latest results</h2></div><div class="season-match-list">${recent.length?recent.map(f=>`<div><b class="form-${esc(f.result||'D')}">${esc(f.result||'D')}</b><span>${esc(f.opponent_name)}</span><strong>${esc(resultScore(f))}</strong></div>`).join(''):'<p class="season-empty">No results yet.</p>'}</div></section>
-        <section class="season-panel"><div class="season-panel-head"><span class="eyebrow">Schedule</span><h2>Upcoming fixtures</h2></div><div class="season-match-list">${upcoming.length?upcoming.map(f=>`<div><small>${esc(dateLabel(f.scheduled_at))}</small><span>${esc(f.opponent_name)}</span><strong>${esc(f.venue==='home'?'H':'A')}</strong></div>`).join(''):'<p class="season-empty">No upcoming fixtures.</p>'}</div></section>
+        <section class="season-panel"><div class="season-panel-head"><span class="eyebrow">Recent form</span><h2>Latest results</h2></div><div class="season-match-list">${recent.length?recent.map(f=>`<div class="season-clickable" data-fixture-id="${esc(f.id)}" role="button" tabindex="0"><b class="form-${esc(f.result||'D')}">${esc(f.result||'D')}</b><span>${esc(f.opponent_name)}</span><strong>${esc(resultScore(f))}</strong></div>`).join(''):'<p class="season-empty">No results yet.</p>'}</div></section>
+        <section class="season-panel"><div class="season-panel-head"><span class="eyebrow">Schedule</span><h2>Upcoming fixtures</h2></div><div class="season-match-list">${upcoming.length?upcoming.map(f=>`<div class="season-clickable" data-fixture-id="${esc(f.id)}" role="button" tabindex="0"><small>${esc(dateLabel(f.scheduled_at))}</small><span>${esc(f.opponent_name)}</span><strong>${esc(f.venue==='home'?'H':'A')}</strong></div>`).join(''):'<p class="season-empty">No upcoming fixtures.</p>'}</div></section>
       </div>`
   }
+  wireFixtureLinks(host)
+  wireFixtureLinks(oldSection)
 }
 
 async function enhance(){
